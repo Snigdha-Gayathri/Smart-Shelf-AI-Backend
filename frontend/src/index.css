@@ -1,0 +1,441 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --dodger-blue: #1e90ff;
+  --primary-text: #1e90ff;
+  --secondary-text-light: #0A1F44;
+  --secondary-text-dark: #e0e7ff;
+  --cream: #fdf6e3;
+  --navy: #1a2233;
+  --gold: #ffd700;
+  --amber: #ffb300;
+  --rounded-2xl: 1.5rem;
+}
+
+/* Global responsive foundation */
+* {
+  box-sizing: border-box;
+}
+
+html, body, #root {
+  width: 100%;
+  min-height: 100%;
+  min-height: 100dvh;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  overflow-x: hidden;
+  /* Safe-area insets for notched devices */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+body {
+  overflow-x: hidden;
+  font-family: 'Inter', 'DM Serif Display', serif;
+  background-color: var(--cream);
+  /* Responsive base font size */
+  font-size: clamp(14px, 2vw, 16px);
+}
+
+/* ── Landscape orientation adjustments ── */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Compact padding in landscape on short screens (phones rotated) */
+  section {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+  }
+  h1 {
+    font-size: clamp(1.25rem, 5vw, 2.5rem) !important;
+  }
+  /* Allow content to scroll naturally instead of forcing full-vh sections */
+  section[style*="min-height"] {
+    min-height: auto !important;
+  }
+}
+
+/* Ensure images/illustrations scale responsively */
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Responsive text scaling */
+h1 {
+  font-size: clamp(1.5rem, 6vw, 3.5rem);
+  line-height: 1.2;
+}
+
+h2 {
+  font-size: clamp(1.25rem, 4vw, 2.25rem);
+  line-height: 1.3;
+}
+
+h3 {
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  line-height: 1.4;
+}
+
+p {
+  font-size: clamp(0.875rem, 1.5vw, 1rem);
+}
+
+button, input, select, textarea {
+  font-size: inherit;
+}
+
+/* Ensure touch targets are at least 44px */
+button, input[type="button"], input[type="submit"], input[type="reset"] {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+.bg-cream {
+  background-color: var(--cream);
+}
+.bg-navy {
+  background-color: var(--navy);
+}
+.text-dodger {
+  color: var(--dodger-blue);
+}
+.text-primary {
+  color: var(--primary-text);
+}
+
+/* Context-aware secondary text colors */
+/* On light/off-white backgrounds (light mode) */
+.text-on-light {
+  color: var(--secondary-text-light);  /* Dark navy blue for contrast on light backgrounds */
+}
+
+/* In dark mode, text-on-light becomes white when inside dark containers */
+.dark .text-on-light {
+  color: #ffffff;
+}
+
+/* On dark backgrounds/containers (light mode only) */
+.text-on-dark {
+  color: #ffffff;  /* White on dark backgrounds in light mode */
+}
+
+.text-gold {
+  color: var(--gold);
+}
+.rounded-2xl {
+  border-radius: var(--rounded-2xl);
+}
+.shadow-lg {
+  box-shadow: 0 4px 24px rgba(30,144,255,0.12);
+}
+.dark .bg-navy {
+  background-color: var(--navy);
+}
+.dark .text-gold {
+  color: var(--gold);
+}
+
+/* Responsive container utilities */
+.container-responsive {
+  width: 100%;
+  padding: clamp(1rem, 3vw, 2rem);
+  margin: 0 auto;
+}
+
+/* Responsive grid for cards */
+.grid-responsive {
+  display: grid;
+  gap: clamp(1rem, 2vw, 1.5rem);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+}
+
+/* Ensure modals are responsive */
+.modal-responsive {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 3vw, 2rem);
+  z-index: 50;
+}
+
+.modal-content-responsive {
+  width: 100%;
+  max-width: min(100vw - 2rem, 500px);
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: var(--rounded-2xl);
+}
+
+/* Flexible form inputs and buttons */
+.input-responsive {
+  width: 100%;
+  padding: clamp(0.5rem, 1.5vw, 0.75rem);
+  font-size: inherit;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.button-responsive {
+  padding: clamp(0.5rem, 1.5vw, 0.75rem) clamp(1rem, 2vw, 1.5rem);
+  border-radius: 0.5rem;
+  font-size: clamp(0.875rem, 1.5vw, 1rem);
+  transition: all 0.3s ease;
+  min-height: 44px;
+}
+
+/* Responsive sections */
+section {
+  width: 100%;
+}
+
+/* ── Glassmorphism / Transparent-modern utilities ── */
+.glass {
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+
+.dark .glass {
+  background: rgba(30, 41, 59, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-strong {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.dark .glass-strong {
+  background: rgba(30, 41, 59, 0.65);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.glass-subtle {
+  background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.dark .glass-subtle {
+  background: rgba(30, 41, 59, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* Glass card hover enhancement */
+.glass-hover {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.glass-hover:hover {
+  background: rgba(255, 255, 255, 0.68);
+  box-shadow: 0 8px 32px rgba(30, 144, 255, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.dark .glass-hover:hover {
+  background: rgba(30, 41, 59, 0.6);
+  box-shadow: 0 8px 32px rgba(30, 144, 255, 0.15), 0 2px 8px rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ══════════════════════════════════════════
+   PREMIUM MICRO-INTERACTIONS
+   ══════════════════════════════════════════ */
+
+/* ── Card hover lift ── */
+.category-card {
+  transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: transform, box-shadow;
+}
+.category-card:hover {
+  transform: translateY(-6px);
+}
+
+/* ── Cover image lift on card hover ── */
+.card-cover-lift {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.category-card:hover .card-cover-lift {
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* ── Button micro-feedback ── */
+button {
+  transition: transform 0.15s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+button:active {
+  transform: scale(0.97);
+}
+
+/* ── Gradient border pseudo-element utility ── */
+.gradient-border {
+  position: relative;
+  z-index: 0;
+}
+.gradient-border::before {
+  content: '';
+  position: absolute;
+  inset: -1.5px;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: linear-gradient(135deg, rgba(30, 144, 255, 0.4), rgba(30, 144, 255, 0.25), rgba(13, 148, 136, 0.4));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.gradient-border:hover::before {
+  opacity: 1;
+}
+
+/* ── Page fade-in animation ── */
+@keyframes pageFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.page-fade-in {
+  animation: pageFadeIn 0.3s ease-out both;
+}
+
+/* ── Section stagger fade-in ── */
+@keyframes sectionSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.section-animate {
+  animation: sectionSlideUp 0.4s ease-out both;
+}
+.section-animate:nth-child(2) { animation-delay: 0.05s; }
+.section-animate:nth-child(3) { animation-delay: 0.10s; }
+.section-animate:nth-child(4) { animation-delay: 0.15s; }
+.section-animate:nth-child(5) { animation-delay: 0.20s; }
+.section-animate:nth-child(6) { animation-delay: 0.25s; }
+
+/* ══════════════════════════════════════════
+   CATEGORY CARD — DECORATIVE STYLES
+   ══════════════════════════════════════════ */
+
+/* ── Educational: Notebook title underline ── */
+.notebook-title-underline {
+  background-image: linear-gradient(transparent calc(100% - 2px), #1E3A8A 2px);
+  background-size: 100% 100%;
+  padding-bottom: 2px;
+}
+.dark .notebook-title-underline {
+  background-image: linear-gradient(transparent calc(100% - 2px), #3B82F6 2px);
+}
+
+/* ── Fiction: Sparkle dot animation ── */
+.sparkle-dot {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #1E90FF;
+  opacity: 0;
+  animation: sparkle 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+.dark .sparkle-dot {
+  background: #60A5FA;
+}
+
+@keyframes sparkle {
+  0%, 100% { opacity: 0; transform: scale(0.6); }
+  50% { opacity: 0.7; transform: scale(1.2); }
+}
+
+/* ══════════════════════════════════════════
+   SKELETON LOADER SHIMMER
+   ══════════════════════════════════════════ */
+
+.skeleton-card {
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+.dark .skeleton-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.06) 25%,
+    rgba(0, 0, 0, 0.10) 50%,
+    rgba(0, 0, 0, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+.dark .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.06) 25%,
+    rgba(255, 255, 255, 0.10) 50%,
+    rgba(255, 255, 255, 0.06) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ══════════════════════════════════════════
+   SMART NOTES PANEL
+   ══════════════════════════════════════════ */
+
+.notes-drawer {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.25s ease-in-out, opacity 0.25s ease;
+  opacity: 0;
+}
+.notes-drawer.open {
+  max-height: 600px;
+  opacity: 1;
+}
+
+.note-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 10px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+.note-tag-pill:hover {
+  filter: brightness(0.9);
+}

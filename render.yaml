@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────
+#  Render Blueprint  —  Smart Shelf AI
+#  Single web service: FastAPI backend serves
+#  the React SPA from frontend/dist
+# ─────────────────────────────────────────────
+
+services:
+  - type: web
+    name: smartshelf-ai
+    runtime: python
+    region: oregon
+
+    # ── Build — install backend deps + build frontend ──
+    buildCommand: |
+      cd backend && pip install -r requirements.txt &&
+      cd ../frontend && npm ci && npm run build
+
+    # ── Start — gunicorn + uvicorn workers ──
+    startCommand: cd backend && gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120 --workers 2
+
+    # ── Environment ──
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11.6"
+      - key: NODE_VERSION
+        value: "20"
+      - key: SKIP_ML
+        value: "0"
+      # Set these in the Render dashboard (secrets):
+      # - GROQ_API_KEY
+      # - MONGODB_URI
+      # - JWT_SECRET
+      # - OPENAI_API_KEY
+
+    # ── Health check ──
+    healthCheckPath: /api/v1/quantum_info
+
+    # ── Plan ──
+    plan: free
