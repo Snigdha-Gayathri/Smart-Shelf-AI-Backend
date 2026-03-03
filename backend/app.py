@@ -588,13 +588,24 @@ def change_password(payload: ChangePasswordPayload):
         from passlib.context import CryptContext
         pwd_ctx = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-        user = db_client.get_user_by_email(payload.email)
-        if not user:
-            return {"status": "error", "error": "User not found"}
         pw_hash = pwd_ctx.hash(payload.new_password)
-        updated = db_client.update_user_password(payload.email, pw_hash)
-        if not updated:
-            return {"status": "error", "error": "Password update failed"}
+
+        # Upsert semantics: if user does not exist yet (e.g., OAuth-only flow),
+        # create a local credential record so login with new password works.
+        user = db_client.get_user_by_email(payload.email)
+        if user:
+            updated = db_client.update_user_password(payload.email, pw_hash)
+            if not updated:
+                return {"status": "error", "error": "Password update failed"}
+        else:
+            db_client.add_user(payload.email, pw_hash)
+
+        # Read-after-write verification to guarantee login will work.
+        persisted = db_client.get_user_by_email(payload.email)
+        if not persisted or not persisted.get("password_hash"):
+            return {"status": "error", "error": "Password update failed: no stored credentials"}
+        if not pwd_ctx.verify(payload.new_password, persisted.get("password_hash")):
+            return {"status": "error", "error": "Password update failed: verification mismatch"}
 
         # Invalidate session token after successful change
         verified_sessions.pop(payload.token, None)
@@ -1069,9 +1080,19 @@ if _FRONTEND_DIR.is_dir():
         if full_path.startswith("api/") or full_path.startswith("auth/") or full_path.startswith("docs") or full_path.startswith("openapi"):
             raise HTTPException(status_code=404, detail="Not found")
         # Try to serve the exact file first (e.g. favicon.ico, robots.txt)
-        file_path = _FRONTEND_DIR / full_path
-        if file_path.is_file() and _FRONTEND_DIR in file_path.resolve().parents or file_path.resolve() == _FRONTEND_DIR / full_path:
-            return FileResponse(str(file_path))
+        requested_path = (_FRONTEND_DIR / full_path).resolve()
+        try:
+            requested_path.relative_to(_FRONTEND_DIR.resolve())
+        except ValueError:
+            raise HTTPException(status_code=404, detail="Not found")
+
+        if requested_path.is_file():
+            return FileResponse(str(requested_path))
+
+        # For direct asset-like requests that are missing, return 404 (not index.html)
+        if full_path and "." in Path(full_path).name:
+            raise HTTPException(status_code=404, detail="Not found")
+
         # Fallback to index.html for SPA routing
         return FileResponse(str(_FRONTEND_DIR / "index.html"))
     logger.info(f"📦 Serving frontend SPA from {_FRONTEND_DIR}")

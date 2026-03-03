@@ -8,6 +8,9 @@ __pycache__/
 *.h5
 *.pt
 .env
+.env.*
+!.env.example
+!.env.*.example
 *.egg-info/
 
 # ── Node / Frontend ──
@@ -27,6 +30,11 @@ backend/book_embeddings_cache.json
 backend/quantum_similarity_cache.json
 *.db
 *.log
+
+# ── Secrets / encrypted vault artifacts ──
+*.env.enc
+*.secrets.enc
+secrets/
 
 # ── OS / Editor ──
 .DS_Store

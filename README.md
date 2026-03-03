@@ -27,6 +27,11 @@ Smart Shelf AI is a **100% local, privacy-preserving** full-stack application th
 - ❌ No external image CDNs
 - ❌ No cloud services
 
+## 🔐 Secrets Handling
+- Keep secrets in local `.env` files only (`frontend/.env.local`, `backend/.env`)
+- Never commit real keys to git
+- Optional local encryption workflow is documented in `SECRETS.md`
+
 ## 🚀 Quick Start (Local)
 
 ### Backend Setup

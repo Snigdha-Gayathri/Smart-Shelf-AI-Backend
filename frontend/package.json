@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "axios": "^1.4.0",
     "framer-motion": "^12.23.24",
     "plotly.js-basic-dist": "^2.25.2",

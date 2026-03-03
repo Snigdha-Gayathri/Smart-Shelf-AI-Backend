@@ -17,18 +17,17 @@ export default function Settings({
 
   // Password change modal state (mock OTP flow)
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [passwordStep, setPasswordStep] = useState('phone') // 'phone' | 'otp' | 'password' | 'success'
-  const [phoneInput, setPhoneInput] = useState('')
+  const [passwordStep, setPasswordStep] = useState('otp') // 'otp' | 'password' | 'success'
   const [otpInput, setOtpInput] = useState('')
   const [otpToken, setOtpToken] = useState('')
   const [newPass, setNewPass] = useState('')
   const [confirmPass, setConfirmPass] = useState('')
   const [pwError, setPwError] = useState('')
   const [pwInfo, setPwInfo] = useState('')
+  const [otpHelperLoading, setOtpHelperLoading] = useState(false)
 
   const resetPasswordFlow = () => {
-    setPasswordStep('phone')
-    setPhoneInput('')
+    setPasswordStep('otp')
     setOtpInput('')
     setOtpToken('')
     setNewPass('')
@@ -74,20 +73,15 @@ export default function Settings({
       setPwError('You must be logged in to change password')
       return
     }
-    if (!phoneInput.trim()) {
-      setPwError('Phone number is required')
-      return
-    }
     try {
       const res = await fetch(`${API_BASE}/auth/request-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneInput.trim() })
+        body: JSON.stringify({ phone: userEmail.trim().toLowerCase() })
       })
       const data = await res.json()
       if (data.status === 'ok') {
-        setPasswordStep('otp')
-        setPwInfo(data.message || 'OTP generated in backend terminal. Enter it here to continue.')
+        setPwInfo(data.message || 'OTP generated in backend terminal automatically. Enter it here to continue.')
       } else {
         setPwError(data.error || 'Failed to request OTP')
       }
@@ -107,7 +101,7 @@ export default function Settings({
       const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: phoneInput.trim(), otp: otpInput.trim() })
+        body: JSON.stringify({ phone: userEmail.trim().toLowerCase(), otp: otpInput.trim() })
       })
       const data = await res.json()
       if (data.status === 'ok' && data.token) {
@@ -119,6 +113,34 @@ export default function Settings({
       }
     } catch (e) {
       setPwError('Network error verifying OTP')
+    }
+  }
+
+  const fetchLatestOtp = async () => {
+    setPwError('')
+    setOtpHelperLoading(true)
+    try {
+      const res = await fetch(`${API_BASE}/auth/latest-otp`)
+      const data = await res.json()
+
+      if (data.status !== 'ok' || !data.has_otp) {
+        setPwError('No OTP available yet. Click Generate OTP first.')
+        return
+      }
+
+      const expected = (userEmail || '').trim().toLowerCase()
+      const actual = (data.phone || '').trim().toLowerCase()
+      if (expected && actual && expected !== actual) {
+        setPwError('Latest OTP belongs to another email. Generate OTP again for your account.')
+        return
+      }
+
+      setOtpInput(data.otp || '')
+      setPwInfo(`Latest OTP fetched: ${data.otp}`)
+    } catch (e) {
+      setPwError('Unable to fetch latest OTP from backend')
+    } finally {
+      setOtpHelperLoading(false)
     }
   }
 
@@ -361,27 +383,9 @@ export default function Settings({
           <div className="glass-strong rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg sm:text-xl font-bold text-primary dark:text-primary mb-4">Change Password</h3>
 
-            {passwordStep === 'phone' && (
-              <div className="space-y-4">
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter your registered phone number</label>
-                <input
-                  type="tel"
-                  value={phoneInput}
-                  onChange={(e) => setPhoneInput(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
-                />
-                <p className="text-xs text-slate-500 dark:text-slate-400">For demo mode, OTP is printed in the backend terminal after you click Send OTP.</p>
-                {pwInfo && <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">{pwInfo}</p>}
-                {pwError && <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{pwError}</p>}
-                <div className="flex gap-3 flex-col-reverse sm:flex-row">
-                  <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
-                  <button onClick={requestOtp} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-cool-blue text-white font-medium hover:bg-cool-accent transition text-sm sm:text-base">Send OTP</button>
-                </div>
-              </div>
-            )}
-
             {passwordStep === 'otp' && (
               <div className="space-y-4">
+                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Email: {userEmail}</label>
                 <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter OTP</label>
                 <input
                   type="text"
@@ -390,10 +394,18 @@ export default function Settings({
                   maxLength={6}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
                 />
+                <button
+                  onClick={fetchLatestOtp}
+                  disabled={otpHelperLoading}
+                  className="w-full text-[11px] sm:text-xs text-cool-blue hover:underline disabled:opacity-60"
+                >
+                  {otpHelperLoading ? 'Fetching latest OTP…' : 'Show OTP from backend (testing helper)'}
+                </button>
                 {pwInfo && <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">{pwInfo}</p>}
                 {pwError && <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{pwError}</p>}
                 <div className="flex gap-3 flex-col-reverse sm:flex-row">
-                  <button onClick={() => { setPasswordStep('phone'); setPwError('') }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Back</button>
+                  <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
+                  <button onClick={requestOtp} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Generate OTP</button>
                   <button onClick={verifyOtp} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-cool-blue text-white font-medium hover:bg-cool-accent transition text-sm sm:text-base">Verify OTP</button>
                 </div>
               </div>

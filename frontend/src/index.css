@@ -495,3 +495,146 @@ button:active {
 .note-tag-pill:hover {
   filter: brightness(0.9);
 }
+
+/* ══════════════════════════════════════════
+   FUTURISTIC AUTH EXPERIENCE
+   ══════════════════════════════════════════ */
+
+.auth-shell {
+  background:
+    radial-gradient(900px 520px at 10% 10%, rgba(37, 99, 235, 0.18), transparent 60%),
+    radial-gradient(700px 460px at 80% 30%, rgba(139, 92, 246, 0.18), transparent 62%),
+    linear-gradient(135deg, #020617 0%, #0b1128 50%, #120b2b 100%);
+}
+
+.auth-aurora {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  pointer-events: none;
+  opacity: 0.5;
+  animation: auth-float 10s ease-in-out infinite;
+}
+
+.auth-aurora-one {
+  width: min(42vw, 540px);
+  height: min(42vw, 540px);
+  top: -12%;
+  left: -8%;
+  background: radial-gradient(circle at 30% 30%, rgba(59, 130, 246, 0.9), rgba(59, 130, 246, 0.1));
+}
+
+.auth-aurora-two {
+  width: min(36vw, 460px);
+  height: min(36vw, 460px);
+  bottom: -16%;
+  right: -6%;
+  background: radial-gradient(circle at 30% 30%, rgba(139, 92, 246, 0.85), rgba(139, 92, 246, 0.1));
+  animation-delay: 1.6s;
+}
+
+.auth-grid-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.09) 1px, transparent 1px);
+  background-size: 46px 46px;
+  mask-image: radial-gradient(circle at center, black 35%, transparent 100%);
+  opacity: 0.26;
+}
+
+.auth-gradient-text {
+  background: linear-gradient(90deg, #60a5fa 0%, #818cf8 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.auth-brand-orb::before,
+.auth-brand-orb::after {
+  content: '';
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(10px);
+}
+
+.auth-brand-orb::before {
+  width: 220px;
+  height: 220px;
+  top: 16%;
+  left: 14%;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.62), rgba(96, 165, 250, 0));
+  animation: auth-float 8.5s ease-in-out infinite;
+}
+
+.auth-brand-orb::after {
+  width: 260px;
+  height: 260px;
+  bottom: 10%;
+  right: 10%;
+  background: radial-gradient(circle, rgba(167, 139, 250, 0.55), rgba(167, 139, 250, 0));
+  animation: auth-float 9.5s ease-in-out infinite reverse;
+}
+
+.auth-field {
+  position: relative;
+}
+
+.auth-field-line {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 0;
+  height: 2px;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, rgba(96, 165, 250, 0), rgba(96, 165, 250, 0.92), rgba(167, 139, 250, 0.92), rgba(167, 139, 250, 0));
+  transform: scaleX(0.15);
+  opacity: 0;
+  transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+}
+
+.auth-field:focus-within .auth-field-line {
+  transform: scaleX(1);
+  opacity: 1;
+}
+
+.animate-auth-shake {
+  animation: auth-shake 0.34s ease-in-out;
+}
+
+@keyframes auth-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -12px, 0);
+  }
+}
+
+@keyframes auth-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-5px);
+  }
+  40% {
+    transform: translateX(5px);
+  }
+  60% {
+    transform: translateX(-3px);
+  }
+  80% {
+    transform: translateX(3px);
+  }
+}
+
+@media (max-width: 1023px) {
+  .auth-grid-overlay {
+    opacity: 0.18;
+  }
+}

@@ -24,7 +24,12 @@ import SkeletonLoader from './components/SkeletonLoader';
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
 
-export default function App() {
+export default function App({ clerk = { enabled: false, isLoaded: false, isSignedIn: false, user: null, signOut: null } }) {
+  const clerkEnabled = Boolean(clerk?.enabled)
+  const isClerkLoaded = Boolean(clerk?.isLoaded)
+  const isSignedIn = Boolean(clerk?.isSignedIn)
+  const clerkUser = clerk?.user || null
+
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [auth, setAuth] = useState(() => {
     try {
@@ -77,6 +82,31 @@ export default function App() {
     document.documentElement.className = theme;
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (!clerkEnabled || !isClerkLoaded) return
+
+    if (isSignedIn && clerkUser) {
+      const nextUser = {
+        id: clerkUser.id,
+        email: clerkUser.primaryEmailAddress?.emailAddress || clerkUser.emailAddresses?.[0]?.emailAddress || '',
+      }
+      const currentId = auth?.user?.id
+      const currentEmail = auth?.user?.email || ''
+      if (currentId !== nextUser.id || currentEmail !== nextUser.email) {
+        handleAuthSuccess({ user: nextUser })
+      }
+      return
+    }
+
+    if (auth) {
+      localStorage.removeItem('auth')
+      setAuth(null)
+      setMenuOpen(false)
+      setActiveSection('home')
+      setRecommendations([])
+    }
+  }, [clerkEnabled, isClerkLoaded, isSignedIn, clerkUser, auth]);
 
   // Persist currentlyReading to storage whenever it changes
   useEffect(() => {
@@ -144,6 +174,9 @@ export default function App() {
 
   // Handle logout - do NOT delete persisted user data (only clear in-memory state)
   function handleLogout() {
+    if (clerkEnabled) {
+      clerk?.signOut?.().catch(() => {})
+    }
     localStorage.removeItem('auth');
     setAuth(null);
     setMenuOpen(false);
@@ -669,7 +702,7 @@ export default function App() {
           <>
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-primary dark:text-primary">Welcome to SmartShelf AI</h2>
             <p className="text-on-light mb-6 text-sm sm:text-base">Please login or create an account to continue.</p>
-            <Auth onSuccess={handleAuthSuccess} />
+            <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
           </>
         )}
         
