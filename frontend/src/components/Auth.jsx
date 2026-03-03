@@ -4,7 +4,7 @@ import { FiEye, FiEyeOff } from 'react-icons/fi'
 import GoogleAuthButtons from './GoogleAuthButtons'
 import qLexiIntroImage from '../assets/qlexi-intro-removebg-preview-removebg-preview.png'
 
-const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
+const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : 'http://127.0.0.1:8000')
 
 const emailRegex = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 

@@ -5,7 +5,7 @@ import SkeletonLoader from './SkeletonLoader'
 
 export default function Recommendations({ recommendations = [], onAddToCurrentlyReading, loading = false }) {
   const [message, setMessage] = useState('')
-  const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://127.0.0.1:8000'
+  const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : 'http://127.0.0.1:8000')
 
   if (loading) {
     return <SkeletonLoader count={6} variant="card" />
