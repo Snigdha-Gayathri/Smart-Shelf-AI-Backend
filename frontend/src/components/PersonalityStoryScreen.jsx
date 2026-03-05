@@ -1,10 +1,24 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { generatePersonalityStory } from '../utils/personalityStoryGenerator';
 
 export default function PersonalityStoryScreen({ previousReads }) {
   const story = generatePersonalityStory(previousReads);
   const booksCompleted = previousReads?.length || 0;
+  const videoRef = useRef(null);
+
+  // Force playback after mount (some browsers block autoplay until interacted)
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRef.current.play().catch(() => {
+        // Autoplay blocked — silently ignored; video is decorative
+      });
+    }
+  }, []);
+
+  // The video file lives in frontend/public/assets/ → served at /assets/... at runtime
+  // File: "QLexi video for Personality Story Box's Background.mp4"
+  const VIDEO_SRC = '/assets/QLexi%20video%20for%20Personality%20Story%20Box\'s%20Background.mp4';
 
   return (
     <section className="personality-section w-full">
@@ -34,19 +48,20 @@ export default function PersonalityStoryScreen({ previousReads }) {
           <div
             className="story-box group relative rounded-2xl sm:rounded-3xl overflow-hidden border-2 border-[#1E90FF] shadow-[0_0_25px_#1E90FF] transition-all duration-500 ease-out hover:shadow-[0_0_40px_#1E90FF,0_0_70px_rgba(30,144,255,0.7)]"
           >
-            {/* Background Video */}
+            {/* Background Video — no blur, autoplay, muted, loop */}
             <video
+              ref={videoRef}
               autoPlay
               loop
               muted
               playsInline
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             >
-              <source src="/assets/QLexi%20video%20for%20Personality%20Story%20Box's%20Background.mp4" type="video/mp4" />
+              <source src={VIDEO_SRC} type="video/mp4" />
             </video>
 
-            {/* Dark Gradient Overlay (No Blur) */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/40 to-black/60 transition-all duration-500 group-hover:from-black/60 group-hover:via-black/30 group-hover:to-black/50" />
+            {/* Dark Gradient Overlay — no blur, enough contrast for text */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/60 transition-all duration-500 group-hover:from-black/65 group-hover:via-black/35 group-hover:to-black/50" />
 
             {/* Content Layer */}
             <div className="story-box-content relative z-10 p-6 sm:p-8 md:p-10 lg:p-12">
@@ -58,8 +73,8 @@ export default function PersonalityStoryScreen({ previousReads }) {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.5 + idx * 0.15, duration: 0.4 }}
-                    className="text-white/95 text-base sm:text-lg md:text-xl leading-relaxed font-medium drop-shadow-lg transition-all duration-500 group-hover:text-white"
-                    style={{ lineHeight: '1.8' }}
+                    className="text-white text-base sm:text-lg md:text-xl leading-relaxed font-semibold drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] transition-all duration-500 group-hover:brightness-110"
+                    style={{ lineHeight: '1.8', textShadow: '0 2px 12px rgba(0,0,0,0.85)' }}
                   >
                     {paragraph}
                   </motion.p>

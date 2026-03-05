@@ -28,14 +28,23 @@ from utils.trope_mapper import derive_tropes, derive_mmc_type
 
 logger = logging.getLogger(__name__)
 
+# ── Module-level books cache — loaded once on first access ──
+_books_cache: List[Dict] = []
+
 
 def _load_books() -> List[Dict]:
-    """Load the local book dataset."""
+    """Return the local book dataset, loading from disk once and caching in memory."""
+    global _books_cache
+    if _books_cache:
+        return _books_cache
     books_path = Path(__file__).parent.parent / "data" / "books_data.json"
     if not books_path.exists():
+        logger.warning(f"Books dataset not found at {books_path}")
         return []
     with open(books_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+        _books_cache = json.load(f)
+    logger.info(f"📚 recommendation_service: loaded {len(_books_cache)} books into cache")
+    return _books_cache
 
 
 def _get_user_trope_weights(user_id: int) -> Dict[str, int]:

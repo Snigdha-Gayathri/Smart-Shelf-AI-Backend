@@ -168,6 +168,20 @@ export default function CategoryStyledBookCard({
 
           <p className="text-xs text-slate-300 mb-2 line-clamp-1">{book.author}</p>
 
+          {/* Genre tag */}
+          {book.genre && (
+            <span
+              className="text-[10px] px-2 py-0.5 rounded-full font-semibold w-fit mb-1.5 inline-block"
+              style={{
+                backgroundColor: 'rgba(30, 144, 255, 0.1)',
+                color: '#93C5FD',
+                border: '1px solid rgba(30, 144, 255, 0.3)',
+              }}
+            >
+              {book.genre}
+            </span>
+          )}
+
           {/* Emotion tags */}
           {book.emotion_tags && book.emotion_tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-auto">
@@ -196,13 +210,25 @@ export default function CategoryStyledBookCard({
         </p>
       )}
 
-      {/* Score row */}
-      {book.score !== undefined && (
+      {/* Score row — personality match + quantum indicator */}
+      {(book.personality_match !== undefined || book.score !== undefined) && (
         <div className="flex items-center justify-between mt-3 pt-2 border-t border-white/10 relative z-[2]">
           <span className="text-xs text-slate-300">
-            Match: <strong style={{ color: '#1E90FF' }}>
-              {(book.score * 100).toFixed(1)}%
-            </strong>
+            {book.personality_match !== undefined ? (
+              <>
+                Personality Match:{' '}
+                <strong style={{ color: '#1E90FF' }}>
+                  {book.personality_match.toFixed(1)}%
+                </strong>
+              </>
+            ) : (
+              <>
+                Match:{' '}
+                <strong style={{ color: '#1E90FF' }}>
+                  {(book.score * 100).toFixed(1)}%
+                </strong>
+              </>
+            )}
           </span>
           {book.quantum_similarity !== undefined && (
             <span className="text-xs italic text-slate-400">⚛️ Quantum</span>

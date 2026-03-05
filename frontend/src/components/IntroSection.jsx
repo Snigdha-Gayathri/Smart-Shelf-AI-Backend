@@ -5,11 +5,17 @@ const BLUE = '#1E90FF'
 const GLOW = `0 0 20px ${BLUE}, 0 0 40px rgba(30,144,255,0.5)`
 const GLOW_SOFT = `0 0 14px rgba(30,144,255,0.25)`
 
+// Backend API base — falls back to same origin in production (Render)
+const API_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL
+    ? import.meta.env.VITE_BACKEND_URL
+    : ''
+  ).trim() || (typeof window !== 'undefined' ? window.location.origin : '')
+
 const FREE_BOOKS = [
   {
     title: 'Ashes and Algorithms',
     author: 'Snigdha Gayathri',
-    file: '/assets/Ashes%20and%20Algorithms%20by%20Snigdha%20Gayathri.pdf',
     downloadName: 'Ashes and Algorithms by Snigdha Gayathri.pdf',
     emoji: '🔥',
     accent: '#F97316',
@@ -17,7 +23,6 @@ const FREE_BOOKS = [
   {
     title: 'Building AI Agents',
     author: '',
-    file: '/assets/Building%20AI%20Agents.pdf',
     downloadName: 'Building AI Agents.pdf',
     emoji: '🤖',
     accent: '#22D3EE',
@@ -25,7 +30,6 @@ const FREE_BOOKS = [
   {
     title: 'Mindset',
     author: 'Carol S. Dweck',
-    file: '/assets/Mindset.pdf',
     downloadName: 'Mindset.pdf',
     emoji: '🧠',
     accent: '#06D6A0',
@@ -33,7 +37,6 @@ const FREE_BOOKS = [
   {
     title: 'The Girl Who Drank The Moon',
     author: 'Kelly Barnhill',
-    file: '/assets/The%20Girl%20Who%20Drank%20The%20Moon.pdf',
     downloadName: 'The Girl Who Drank The Moon.pdf',
     emoji: '🌙',
     accent: '#A78BFA',
@@ -41,12 +44,37 @@ const FREE_BOOKS = [
   {
     title: 'The Joy Of X',
     author: 'Steven Strogatz',
-    file: '/assets/The%20Joy%20Of%20X.pdf',
     downloadName: 'The Joy Of X.pdf',
     emoji: '📐',
     accent: '#FFD166',
   },
 ]
+
+/** Trigger a file download via the backend /api/v1/download endpoint.
+ *  This ensures correct Content-Disposition headers work on Render in production. */
+async function triggerDownload(downloadName) {
+  const url = `${API_BASE}/api/v1/download/${encodeURIComponent(downloadName)}`
+  try {
+    const resp = await fetch(url)
+    if (!resp.ok) {
+      // Fallback: open the asset directly
+      window.open(`${API_BASE}/assets/${encodeURIComponent(downloadName)}`, '_blank')
+      return
+    }
+    const blob = await resp.blob()
+    const objectUrl = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = objectUrl
+    a.download = downloadName
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 5000)
+  } catch {
+    // Last-resort fallback
+    window.open(`${API_BASE}/assets/${encodeURIComponent(downloadName)}`, '_blank')
+  }
+}
 
 export default function IntroSection() {
   return (
@@ -188,10 +216,9 @@ they match your mood, your mindset, and your heart 💫`}
                   </div>
 
                   {/* Download button */}
-                  <a
-                    href={book.file}
-                    download={book.downloadName}
-                    className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105"
+                  <button
+                    onClick={() => triggerDownload(book.downloadName)}
+                    className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105 cursor-pointer"
                     style={{
                       border: `1.5px solid ${BLUE}`,
                       background: 'rgba(30,144,255,0.12)',
@@ -200,7 +227,7 @@ they match your mood, your mindset, and your heart 💫`}
                     onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = 'rgba(30,144,255,0.12)' }}
                   >
                     ⬇ Download
-                  </a>
+                  </button>
                 </motion.div>
               ))}
             </div>

@@ -7,7 +7,23 @@ import os
 
 logger = logging.getLogger(__name__)
 
-GOOGLE_OAUTH_CLIENT_ID = os.getenv("GOOGLE_OAUTH_CLIENT_ID")
+# ── Google OAuth credentials ───────────────────────────────────────────────
+# These MUST be set as environment variables in Render (Settings → Environment).
+# Do NOT hardcode credentials in source code.
+#
+# Required variables:
+#   GOOGLE_CLIENT_ID      — your OAuth 2.0 client ID from Google Cloud Console
+#   GOOGLE_CLIENT_SECRET  — your OAuth 2.0 client secret (used for server-side flows)
+#
+# Legacy alias also accepted (GOOGLE_OAUTH_CLIENT_ID) for backward compatibility.
+GOOGLE_CLIENT_ID: str = (
+    os.getenv("GOOGLE_CLIENT_ID") or os.getenv("GOOGLE_OAUTH_CLIENT_ID") or ""
+)
+GOOGLE_CLIENT_SECRET: str = os.getenv("GOOGLE_CLIENT_SECRET") or ""
+
+# Internal alias (kept for any existing code that imports GOOGLE_OAUTH_CLIENT_ID)
+GOOGLE_OAUTH_CLIENT_ID = GOOGLE_CLIENT_ID
+
 GOOGLE_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/tokeninfo"
 
 
@@ -22,8 +38,11 @@ def verify_google_token(id_token: str) -> Dict | None:
         Token payload with user info if valid, None if invalid
     """
     try:
-        if not GOOGLE_OAUTH_CLIENT_ID:
-            logger.error("❌ GOOGLE_OAUTH_CLIENT_ID not set in environment variables!")
+        if not GOOGLE_CLIENT_ID:
+            logger.error(
+                "❌ GOOGLE_CLIENT_ID not set! "
+                "Add it to Render Environment Variables: GOOGLE_CLIENT_ID=<your-client-id>"
+            )
             return None
         
         # Verify token with Google
@@ -39,8 +58,8 @@ def verify_google_token(id_token: str) -> Dict | None:
         payload = response.json()
         
         # Verify the token is for our app
-        if payload.get("aud") != GOOGLE_OAUTH_CLIENT_ID:
-            logger.warning(f"❌ Token audience mismatch. Expected {GOOGLE_OAUTH_CLIENT_ID}, got {payload.get('aud')}")
+        if payload.get("aud") != GOOGLE_CLIENT_ID:
+            logger.warning(f"❌ Token audience mismatch. Expected {GOOGLE_CLIENT_ID}, got {payload.get('aud')}")
             return None
         
         logger.info(f"✅ Google token verified for user {payload.get('email')}")

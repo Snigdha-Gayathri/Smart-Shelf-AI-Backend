@@ -132,6 +132,9 @@ if therapist_router is not None:
 # readiness flag (set to True after ML warmup and cache build)
 server_ready = False
 
+# ── In-memory book dataset (loaded ONCE at startup — avoids repeated disk I/O) ──
+_BOOKS_DATASET: List[Dict[str, Any]] = []
+
 # --- Mock OTP storage (for dev/testing only) ---
 # In-memory stores with short-lived entries; replace with real SMS provider later.
 otp_store: dict[str, dict] = {}
@@ -222,15 +225,145 @@ class ChangePasswordPayload(BaseModel):
     token: str
 
 
-def _load_books_dataset() -> List[Dict[str, Any]]:
-    import json
-    from pathlib import Path
-
+def _get_books_dataset() -> List[Dict[str, Any]]:
+    """Return the in-memory book dataset, loading from disk if not yet cached."""
+    global _BOOKS_DATASET
+    if _BOOKS_DATASET:
+        return _BOOKS_DATASET
+    import json as _json
     books_path = Path(__file__).parent / "data" / "books_data.json"
-    if not books_path.exists():
-        return []
-    with open(books_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    if books_path.exists():
+        with open(books_path, "r", encoding="utf-8") as f:
+            _BOOKS_DATASET = _json.load(f)
+        logger.info(f"📚 Loaded {len(_BOOKS_DATASET)} books from dataset into memory")
+    return _BOOKS_DATASET
+
+
+def _load_books_dataset() -> List[Dict[str, Any]]:
+    """Alias kept for backward-compat with lexi-chat. Uses cached dataset."""
+    return _get_books_dataset()
+
+
+# ── Personality Match Helpers ──────────────────────────────────────────────
+
+
+def _derive_user_personality_vector(text: str, compound_emotions: Optional[Dict] = None) -> List[float]:
+    """Derive a 5-dim Big-5 personality vector from query text + detected emotions.
+
+    Dimensions: [Openness, Conscientiousness, Extraversion, Agreeableness, Neuroticism]
+    """
+    openness_w = {"curious", "wonder", "creative", "adventure", "explore", "discover",
+                  "fantasy", "imagination", "mystery", "learn", "magical", "philosophy"}
+    conscientiousness_w = {"discipline", "study", "productive", "focus", "goal", "success",
+                           "achieve", "work", "organize", "plan", "structured", "strategy"}
+    extraversion_w = {"exciting", "fun", "social", "energy", "action", "thrilling",
+                      "adventure", "bold", "confident", "lively", "vibrant", "charismatic"}
+    agreeableness_w = {"love", "romance", "care", "empathy", "family", "friendship",
+                       "warm", "kind", "help", "support", "compassion", "tenderness"}
+    neuroticism_w = {"anxiety", "sad", "fear", "dark", "tense", "suspense",
+                     "stress", "worry", "lonely", "grief", "trauma", "tension"}
+
+    tokens = set(re.findall(r"\w+", (text or "").lower()))
+    dims = [openness_w, conscientiousness_w, extraversion_w, agreeableness_w, neuroticism_w]
+    vec = [0.5, 0.5, 0.5, 0.5, 0.5]
+    for i, dim_words in enumerate(dims):
+        hits = len(tokens & dim_words)
+        vec[i] = min(0.9, 0.5 + hits * 0.1)
+
+    # Refine using emotion analysis if available
+    if compound_emotions:
+        emotion_map = {
+            "curiosity": (0, 0.15), "admiration": (0, 0.10),
+            "pride": (1, 0.10), "approval": (1, 0.10),
+            "excitement": (2, 0.15), "joy": (2, 0.10),
+            "love": (3, 0.15), "gratitude": (3, 0.10),
+            "sadness": (4, 0.15), "fear": (4, 0.10), "anger": (4, 0.05),
+        }
+        for emotion, (dim, weight) in emotion_map.items():
+            if emotion in compound_emotions:
+                vec[dim] = min(0.9, vec[dim] + weight * float(compound_emotions[emotion]))
+
+    return vec
+
+
+def _compute_personality_match(user_vector: List[float], book_vector: List[float]) -> float:
+    """Cosine similarity between user and book personality vectors.
+
+    Returns a score scaled to a realistic display range of 60–95%, rounded to 1 dp.
+    This guarantees the field is never 0.0 and varies meaningfully across books.
+    """
+    import numpy as np
+    u = np.array(user_vector, dtype=np.float64)
+    b = np.array(book_vector, dtype=np.float64)
+    norm_u = np.linalg.norm(u)
+    norm_b = np.linalg.norm(b)
+    if norm_u < 1e-10 or norm_b < 1e-10:
+        return 70.0
+    cosine_sim = float(np.dot(u, b) / (norm_u * norm_b))
+    # Map cosine similarity [0..1] → display range [60..95]
+    score = 60.0 + cosine_sim * 35.0
+    return round(min(max(score, 60.0), 95.0), 1)
+
+
+# ── Query-based genre/tag filtering ────────────────────────────────────────
+
+
+def _filter_books_by_query(books: List[Dict[str, Any]], query: str) -> List[Dict[str, Any]]:
+    """Pre-filter books by genre / embedding_tags before ML scoring.
+
+    Prevents off-topic books (e.g. romance) appearing when user asks for
+    'psychological thriller'.  Only applies the filter when ≥3 matches exist
+    so we never return an empty list due to an overly strict filter.
+    """
+    if not query:
+        return books
+
+    query_lower = query.lower()
+    query_tokens = set(re.findall(r"\w+", query_lower))
+
+    # Genre keyword groups — tokens that strongly signal a genre
+    genre_clusters: Dict[str, set] = {
+        "thriller":   {"thriller", "suspense", "crime", "psychological", "mystery", "detective"},
+        "romance":    {"romance", "romantic", "love", "relationship", "contemporary"},
+        "fantasy":    {"fantasy", "magic", "wizard", "dragon", "fairy", "epic"},
+        "scifi":      {"scifi", "sci", "space", "robot", "future", "dystopia", "cyberpunk"},
+        "horror":     {"horror", "scary", "dark", "ghost", "supernatural", "creepy"},
+        "mystery":    {"mystery", "detective", "investigation", "whodunit", "noir"},
+        "historical": {"historical", "history", "war", "period", "medieval", "ancient"},
+        "self_help":  {"selfhelp", "mindset", "productivity", "habits", "motivation"},
+        "educational":{"educational", "learn", "academic", "study", "textbook"},
+    }
+
+    matched_filter_tokens: set = set()
+    for _cluster_name, keywords in genre_clusters.items():
+        if query_tokens & keywords:
+            matched_filter_tokens.update(keywords)
+            matched_filter_tokens.update(query_tokens & keywords)
+
+    if not matched_filter_tokens:
+        return books  # No strong genre signal — return full set
+
+    # Allow query tokens that aren't purely stop-words to contribute too
+    stop_words = {"a", "an", "the", "for", "and", "or", "i", "want", "book", "books",
+                  "read", "reading", "something", "me", "give", "suggest", "show"}
+    meaningful_query_tokens = {t for t in query_tokens if len(t) > 3 and t not in stop_words}
+    filter_tokens = matched_filter_tokens | meaningful_query_tokens
+
+    filtered = []
+    for book in books:
+        genre_str = (book.get("genre") or "").lower()
+        etags = [t.lower() for t in (book.get("embedding_tags") or [])]
+        book_type = (book.get("type") or "").lower()
+        book_tokens = set(re.findall(r"\w+", f"{genre_str} {' '.join(etags)} {book_type}"))
+        if filter_tokens & book_tokens:
+            filtered.append(book)
+
+    if len(filtered) >= 3:
+        logger.info(f"🔍 Query filter: {len(filtered)}/{len(books)} books matched genre/tag tokens")
+        return filtered
+
+    logger.info(f"⚠️  Query filter too restrictive ({len(filtered)} hits) — returning full set of {len(books)}")
+    return books
 
 
 def _tokenize_text(value: str) -> set[str]:
@@ -336,7 +469,20 @@ async def startup_event():
         load_embedding_cache = None
         load_quantum_cache = None
 
-    global book_embedding_cache, quantum_cache, server_ready
+    global book_embedding_cache, quantum_cache, server_ready, _BOOKS_DATASET
+
+    # ── Load books dataset into memory FIRST (fast, ~1 ms) ──
+    try:
+        import json as _json
+        _bp = Path(__file__).parent / "data" / "books_data.json"
+        if _bp.exists():
+            with open(_bp, "r", encoding="utf-8") as _f:
+                _BOOKS_DATASET = _json.load(_f)
+            logger.info(f"✅ Dataset loaded: {len(_BOOKS_DATASET)} books cached in memory")
+        else:
+            logger.warning("⚠️  books_data.json not found — dataset will be empty")
+    except Exception as _ds_err:
+        logger.error(f"❌ Failed to load books dataset: {_ds_err}")
 
     # Try loading caches from disk
     try:
@@ -362,9 +508,12 @@ async def startup_event():
             except Exception as e:
                 logger.warning(f"warmup() failed: {e}")
 
-            books_path = Path(__file__).parent / "data" / "books_data.json"
-            with open(books_path, 'r', encoding='utf-8') as f:
-                books = json.load(f)
+            # Reuse the already-loaded in-memory dataset (avoid second disk read)
+            books = _BOOKS_DATASET or []
+            if not books:
+                books_path = Path(__file__).parent / "data" / "books_data.json"
+                with open(books_path, 'r', encoding='utf-8') as f:
+                    books = json.load(f)
 
             if not book_embedding_cache:
                 logger.info("Building book embeddings cache (this may take a while)...")
@@ -629,27 +778,29 @@ async def recommend(mood: MoodRequest):
       • CPU-bound work offloaded to thread pool
     """
     try:
-        import json
         import time as _time
-        from pathlib import Path
 
         t_start = _time.perf_counter()
         text = mood.text or ""
-        logger.info(f"Processing recommendation for prompt: '{text[:50]}...'")
+        logger.info(f"🔎 Recommendation request: '{text[:80]}'")
 
-        # Load local book dataset
-        books_path = Path(__file__).parent / "data" / "books_data.json"
-        if not books_path.exists():
-            logger.error(f"Books dataset not found at {books_path}")
+        # ── Use in-memory dataset (loaded once at startup) ──
+        books = list(_get_books_dataset())
+        if not books:
+            logger.error("Books dataset is empty — check books_data.json")
             return {"error": "Local book dataset not found", "recommendations": []}
 
-        with open(books_path, 'r', encoding='utf-8') as f:
-            books = json.load(f)
+        logger.info(f"📚 Dataset: {len(books)} books available")
 
+        # ── Step 1: filter by explicit book type ──
         requested_type = _detect_requested_book_type(text)
         if requested_type:
             books = [b for b in books if b.get("type") == requested_type]
-            logger.info(f"Applied strict recommendation type filter: {requested_type} ({len(books)} candidates)")
+            logger.info(f"Type filter '{requested_type}': {len(books)} candidates")
+
+        # ── Step 2: filter by genre / embedding_tags before ML scoring ──
+        books = _filter_books_by_query(books, text)
+        logger.info(f"After query filter: {len(books)} candidate books")
 
         if not books:
             logger.warning("No books available after applying requested type filter")
@@ -682,6 +833,12 @@ async def recommend(mood: MoodRequest):
         else:
             user_analysis = {"compound_emotions": {}}
             user_embedding = None
+
+        # ── Derive user personality vector from text + detected emotions ──
+        user_personality_vector = _derive_user_personality_vector(
+            text, user_analysis.get("compound_emotions", {})
+        )
+        logger.info(f"👤 User personality vector: {[round(v,2) for v in user_personality_vector]}")
 
         # Calculate similarity for each book
         recommendations = []
@@ -780,6 +937,7 @@ async def recommend(mood: MoodRequest):
                         "mood": book.get("mood"),
                         "tone": book.get("tone"),
                         "pacing": book.get("pacing"),
+                        "personality_vector": book.get("personality_vector", []),
                         "score": float(hybrid_scores[idx]),
                         "matchScore": float(hybrid_scores[idx]),
                         "classical_similarity": float(cosine_scores[idx]),
@@ -799,6 +957,7 @@ async def recommend(mood: MoodRequest):
                         "mood": book.get("mood"),
                         "tone": book.get("tone"),
                         "pacing": book.get("pacing"),
+                        "personality_vector": book.get("personality_vector", []),
                         "score": 0.0,
                         "matchScore": 0.0,
                         "classical_similarity": 0.0,
@@ -823,6 +982,7 @@ async def recommend(mood: MoodRequest):
                     "mood": book.get("mood"),
                     "tone": book.get("tone"),
                     "pacing": book.get("pacing"),
+                    "personality_vector": book.get("personality_vector", []),
                     "score": float(classical_sim),
                     "matchScore": float(classical_sim),
                     "classical_similarity": float(classical_sim),
@@ -831,6 +991,15 @@ async def recommend(mood: MoodRequest):
 
         # Sort by matchScore descending (strict)
         recommendations.sort(key=lambda x: x["matchScore"], reverse=True)
+
+        # ── Compute personality match for every candidate ──
+        for rec in recommendations:
+            book_pv = rec.get("personality_vector") or [0.5, 0.5, 0.5, 0.5, 0.5]
+            rec["personality_match"] = _compute_personality_match(user_personality_vector, book_pv)
+
+        if recommendations:
+            scores_sample = [r["personality_match"] for r in recommendations[:5]]
+            logger.info(f"🧬 Personality match scores (top 5): {scores_sample}")
 
         # Enrich top recommendations with cover images and explanation
         enriched = []
@@ -845,6 +1014,10 @@ async def recommend(mood: MoodRequest):
             except Exception:
                 reason = None
             book["reason"] = reason
+            logger.debug(
+                f"  📖 {book.get('title')} | match={book.get('matchScore', 0):.3f} "
+                f"personality={book.get('personality_match')}%"
+            )
             enriched.append(book)
 
         elapsed_ms = (_time.perf_counter() - t_start) * 1000
@@ -1063,23 +1236,84 @@ def quantum_info():
     return info
 
 
+@app.get("/api/v1/download/{filename}")
+async def download_book(filename: str, request: Request):
+    """Serve downloadable book files (PDFs) with correct Content-Disposition header.
+
+    Files are served from frontend/dist/assets/ (populated from frontend/public/assets/).
+    Example: GET /api/v1/download/Building%20AI%20Agents.pdf
+
+    NOTE: Ensure PDF files are placed in frontend/public/assets/ before running
+    `npm run build` so they are included in the dist output.
+    """
+    # Prevent path traversal
+    safe_name = Path(filename).name
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    # Search in frontend/dist/assets (production build) and frontend/public/assets (dev)
+    candidates = [
+        _FRONTEND_DIR / "assets" / safe_name,
+        Path(__file__).resolve().parent.parent / "frontend" / "public" / "assets" / safe_name,
+    ]
+    file_path = next((p for p in candidates if p.is_file()), None)
+
+    if file_path is None:
+        logger.warning(f"Download requested for missing file: {safe_name}")
+        raise HTTPException(status_code=404, detail=f"File '{safe_name}' not found")
+
+    logger.info(f"📥 Download: {safe_name} from {file_path}")
+    return FileResponse(
+        str(file_path),
+        media_type="application/octet-stream",
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
+    )
+
+
 # ══════════════════════════════════════════════════════════
 #  Serve the built React SPA (frontend/dist) in production
 # ══════════════════════════════════════════════════════════
 _FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend" / "dist"
 
 if _FRONTEND_DIR.is_dir():
-    # Serve static assets (JS, CSS, images)
-    app.mount("/assets", StaticFiles(directory=str(_FRONTEND_DIR / "assets")), name="frontend-assets")
-    # Serve other static files from the public folder that end up in dist root (covers, pdfs)
-    app.mount("/covers", StaticFiles(directory=str(_FRONTEND_DIR / "covers")), name="frontend-covers") if (_FRONTEND_DIR / "covers").is_dir() else None
-    # Catch-all: serve index.html for any non-API route (SPA client-side routing)
+    # ── Static asset mounts ──────────────────────────────────────────────────
+    # /assets  → JS, CSS, images, videos, PDFs (Vite builds here)
+    _assets_dir = _FRONTEND_DIR / "assets"
+    if _assets_dir.is_dir():
+        app.mount("/assets", StaticFiles(directory=str(_assets_dir)), name="frontend-assets")
+        logger.info(f"📁 Mounted /assets → {_assets_dir}")
+
+    # /covers  → book cover images (SVG/PNG copied from public/covers)
+    _covers_dir = _FRONTEND_DIR / "covers"
+    if _covers_dir.is_dir():
+        app.mount("/covers", StaticFiles(directory=str(_covers_dir)), name="frontend-covers")
+        logger.info(f"📁 Mounted /covers → {_covers_dir}")
+
+    # /static/covers  → same covers, via /static prefix (backward-compat)
+    if _covers_dir.is_dir():
+        app.mount("/static/covers", StaticFiles(directory=str(_covers_dir)), name="static-covers")
+
+    # /static/backgrounds  → background images
+    _bg_dir = _assets_dir if _assets_dir.is_dir() else None
+    if _bg_dir and _bg_dir.is_dir():
+        app.mount("/static/backgrounds", StaticFiles(directory=str(_bg_dir)), name="static-backgrounds")
+
+    # /static/videos  → video files (served from assets)
+    if _bg_dir and _bg_dir.is_dir():
+        app.mount("/static/videos", StaticFiles(directory=str(_bg_dir)), name="static-videos")
+
+    # /static/downloads  → downloadable PDFs (served from assets)
+    if _assets_dir.is_dir():
+        app.mount("/static/downloads", StaticFiles(directory=str(_assets_dir)), name="static-downloads")
+        logger.info(f"📁 Mounted /static/downloads → {_assets_dir}")
+
+    # ── SPA catch-all: serve index.html for all non-API routes ──────────────
     @app.get("/{full_path:path}")
     async def _spa_fallback(request: Request, full_path: str):
-        # Skip API routes
-        if full_path.startswith("api/") or full_path.startswith("auth/") or full_path.startswith("docs") or full_path.startswith("openapi"):
+        # Skip API / auth / docs routes
+        if any(full_path.startswith(p) for p in ("api/", "auth/", "docs", "openapi", "redoc")):
             raise HTTPException(status_code=404, detail="Not found")
-        # Try to serve the exact file first (e.g. favicon.ico, robots.txt)
+        # Try to serve the exact file first (favicon, robots.txt, etc.)
         requested_path = (_FRONTEND_DIR / full_path).resolve()
         try:
             requested_path.relative_to(_FRONTEND_DIR.resolve())
@@ -1089,12 +1323,13 @@ if _FRONTEND_DIR.is_dir():
         if requested_path.is_file():
             return FileResponse(str(requested_path))
 
-        # For direct asset-like requests that are missing, return 404 (not index.html)
+        # Return 404 for explicit asset-like paths that are missing
         if full_path and "." in Path(full_path).name:
             raise HTTPException(status_code=404, detail="Not found")
 
-        # Fallback to index.html for SPA routing
+        # Fallback: return index.html for SPA client-side routing
         return FileResponse(str(_FRONTEND_DIR / "index.html"))
+
     logger.info(f"📦 Serving frontend SPA from {_FRONTEND_DIR}")
 else:
     logger.info("ℹ️  No frontend/dist found — run 'npm run build' in frontend/ to enable SPA serving")
