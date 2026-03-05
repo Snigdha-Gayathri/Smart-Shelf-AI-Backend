@@ -500,7 +500,6 @@ async def startup_event():
             from services.embedding_cache import build_cache
             from services.quantum_cache_v2 import build_quantum_cache, save_pca_projection, load_pca_projection
             import json
-            from pathlib import Path
 
             logger.info("ML pipeline enabled — warming up and (re)building caches...")
             try:
