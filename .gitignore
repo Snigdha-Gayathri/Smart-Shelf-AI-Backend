@@ -18,12 +18,14 @@ node_modules/
 frontend/dist/
 
 # ── Heavy assets (PDFs, large images, video) ──
-# These should be hosted externally or fetched at build time
-*.pdf
-*.mp4
-frontend/public/assets/IntroSection Background.png
-frontend/public/assets/healthymind.png
-frontend/public/assets/fairycastle.png
+# Now stored in proper locations and tracked in git
+# backend/static/books/ — downloadable PDFs (tracked)
+# frontend/public/images/ — UI images (tracked)
+# frontend/public/videos/ — video backgrounds (tracked)
+
+# Still ignore any stray large binaries outside the designated asset folders:
+frontend/public/assets/*.pdf
+frontend/public/assets/*.mp4
 
 # ── Caches & build artifacts ──
 backend/book_embeddings_cache.json

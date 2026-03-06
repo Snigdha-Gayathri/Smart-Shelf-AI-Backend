@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 
 const BLUE = '#1E90FF'
@@ -12,71 +12,18 @@ const API_BASE =
     : ''
   ).trim() || (typeof window !== 'undefined' ? window.location.origin : '')
 
-const FREE_BOOKS = [
-  {
-    title: 'Ashes and Algorithms',
-    author: 'Snigdha Gayathri',
-    downloadName: 'Ashes and Algorithms by Snigdha Gayathri.pdf',
-    emoji: '🔥',
-    accent: '#F97316',
-  },
-  {
-    title: 'Building AI Agents',
-    author: '',
-    downloadName: 'Building AI Agents.pdf',
-    emoji: '🤖',
-    accent: '#22D3EE',
-  },
-  {
-    title: 'Mindset',
-    author: 'Carol S. Dweck',
-    downloadName: 'Mindset.pdf',
-    emoji: '🧠',
-    accent: '#06D6A0',
-  },
-  {
-    title: 'The Girl Who Drank The Moon',
-    author: 'Kelly Barnhill',
-    downloadName: 'The Girl Who Drank The Moon.pdf',
-    emoji: '🌙',
-    accent: '#A78BFA',
-  },
-  {
-    title: 'The Joy Of X',
-    author: 'Steven Strogatz',
-    downloadName: 'The Joy Of X.pdf',
-    emoji: '📐',
-    accent: '#FFD166',
-  },
-]
 
-/** Trigger a file download via the backend /api/v1/download endpoint.
- *  This ensures correct Content-Disposition headers work on Render in production. */
-async function triggerDownload(downloadName) {
-  const url = `${API_BASE}/api/v1/download/${encodeURIComponent(downloadName)}`
-  try {
-    const resp = await fetch(url)
-    if (!resp.ok) {
-      // Fallback: open the asset directly
-      window.open(`${API_BASE}/assets/${encodeURIComponent(downloadName)}`, '_blank')
-      return
-    }
-    const blob = await resp.blob()
-    const objectUrl = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = objectUrl
-    a.download = downloadName
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(objectUrl), 5000)
-  } catch {
-    // Last-resort fallback
-    window.open(`${API_BASE}/assets/${encodeURIComponent(downloadName)}`, '_blank')
-  }
-}
 
 export default function IntroSection() {
+  const [freeBooks, setFreeBooks] = useState([])
+
+  useEffect(() => {
+    fetch(`${API_BASE}/api/free-books`)
+      .then(r => r.json())
+      .then(data => setFreeBooks(data))
+      .catch(() => setFreeBooks([]))
+  }, [])
+
   return (
     <section
       className="relative w-full"
@@ -86,7 +33,7 @@ export default function IntroSection() {
       <div
         className="absolute inset-0"
         style={{
-          backgroundImage: "url('/assets/IntroSection%20Background.png')",
+          backgroundImage: "url('/images/intro_library.png')",
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           backgroundRepeat: 'no-repeat',
@@ -99,7 +46,7 @@ export default function IntroSection() {
         className="relative z-10 w-full max-w-[1600px] mx-auto px-3 sm:px-6 md:px-8"
       >
         <div className="flex flex-col py-4 sm:py-8 md:py-10">
-          <IntroContent />
+          <IntroContent freeBooks={freeBooks} />
         </div>
       </div>
     </section>
@@ -109,7 +56,7 @@ export default function IntroSection() {
 /* ═══════════════════════════════════════════════════════════
    Extracted content component — shared by mobile & desktop
    ═══════════════════════════════════════════════════════════ */
-function IntroContent() {
+function IntroContent({ freeBooks }) {
   return (
     <>
 
@@ -184,7 +131,7 @@ they match your mood, your mindset, and your heart 💫`}
 
             {/* 5 Free Books — single uniform row */}
             <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 w-full">
-              {FREE_BOOKS.map((book, i) => (
+              {freeBooks.map((book, i) => (
                 <motion.div
                   key={book.title}
                   initial={{ opacity: 0, y: 20 }}
@@ -192,33 +139,34 @@ they match your mood, your mindset, and your heart 💫`}
                   transition={{ delay: 0.9 + i * 0.1, duration: 0.4 }}
                   className="group flex flex-col items-center"
                 >
-                  {/* Uniform cover */}
+                  {/* Cover image with text fallback */}
                   <div
-                    className="w-full aspect-[2/3] rounded-xl flex flex-col items-center justify-center mb-2.5 transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_18px_rgba(30,144,255,0.6)]"
+                    className="w-full aspect-[2/3] rounded-xl overflow-hidden mb-2.5 transition-all duration-300 group-hover:scale-105 group-hover:shadow-[0_0_18px_rgba(30,144,255,0.6)]"
                     style={{
-                      background: `linear-gradient(145deg, ${book.accent}25, ${book.accent}10)`,
-                      border: `2px solid ${book.accent}60`,
-                      boxShadow: `inset 0 0 30px ${book.accent}08`,
+                      background: 'linear-gradient(145deg, rgba(30,144,255,0.15), rgba(30,144,255,0.05))',
+                      border: '2px solid rgba(30,144,255,0.4)',
                     }}
                   >
-                    <span className="text-3xl sm:text-4xl mb-2">{book.emoji}</span>
-                    <span
-                      className="text-[10px] sm:text-xs font-bold text-white/90 text-center px-2 leading-tight"
-                      style={{ textShadow: '0 1px 4px rgba(0,0,0,0.4)' }}
-                    >
-                      {book.title}
-                    </span>
-                    {book.author && (
-                      <span className="text-[8px] sm:text-[10px] text-white/50 mt-1 text-center px-2">
-                        {book.author}
-                      </span>
-                    )}
+                    <img
+                      src={book.cover}
+                      alt={book.title}
+                      className="w-full h-full object-cover"
+                      onError={e => {
+                        e.currentTarget.style.display = 'none'
+                        e.currentTarget.parentElement.classList.add('flex', 'flex-col', 'items-center', 'justify-center')
+                        e.currentTarget.parentElement.insertAdjacentHTML('beforeend',
+                          `<span class="text-[10px] sm:text-xs font-bold text-white/90 text-center px-2 leading-tight">${book.title}</span>` +
+                          (book.author ? `<span class="text-[8px] sm:text-[10px] text-white/50 mt-1 text-center px-2">${book.author}</span>` : '')
+                        )
+                      }}
+                    />
                   </div>
 
-                  {/* Download button */}
-                  <button
-                    onClick={() => triggerDownload(book.downloadName)}
-                    className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105 cursor-pointer"
+                  {/* Download anchor */}
+                  <a
+                    href={book.download_url}
+                    download
+                    className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105 no-underline block"
                     style={{
                       border: `1.5px solid ${BLUE}`,
                       background: 'rgba(30,144,255,0.12)',
@@ -227,7 +175,7 @@ they match your mood, your mindset, and your heart 💫`}
                     onMouseLeave={e => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.background = 'rgba(30,144,255,0.12)' }}
                   >
                     ⬇ Download
-                  </button>
+                  </a>
                 </motion.div>
               ))}
             </div>

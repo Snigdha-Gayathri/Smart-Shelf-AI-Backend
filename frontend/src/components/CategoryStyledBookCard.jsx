@@ -12,9 +12,9 @@ import React, { useState } from 'react'
 
 // ── Background image map ──
 const backgroundImages = {
-  educational: '/assets/school.jpg',
-  fiction: '/assets/fairycastle.png',
-  'self-help': '/assets/healthymind.png',
+  educational: '/images/school.jpg',
+  fiction: '/images/fairycastle.png',
+  'self-help': '/images/healthymind.png',
 }
 
 // ── Theme palettes (zero purple — only blue/teal accents) ──

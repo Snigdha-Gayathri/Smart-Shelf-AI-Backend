@@ -1,0 +1,32 @@
+[
+  {
+    "title": "Alice's Adventures in Wonderland",
+    "author": "Lewis Carroll",
+    "cover": "/covers/alice.jpg",
+    "download_url": "/static/books/alice_in_wonderland.pdf"
+  },
+  {
+    "title": "Pride and Prejudice",
+    "author": "Jane Austen",
+    "cover": "/covers/pride_and_prejudice.jpg",
+    "download_url": "/static/books/pride_and_prejudice.pdf"
+  },
+  {
+    "title": "The Picture of Dorian Gray",
+    "author": "Oscar Wilde",
+    "cover": "/covers/dorian_gray.jpg",
+    "download_url": "/static/books/dorian_gray.pdf"
+  },
+  {
+    "title": "Wuthering Heights",
+    "author": "Emily Brontë",
+    "cover": "/covers/wuthering_heights.jpg",
+    "download_url": "/static/books/wuthering_heights.pdf"
+  },
+  {
+    "title": "Ashes and Algorithms",
+    "author": "Snigdha Gayathri",
+    "cover": "/covers/ashes_and_algorithms.jpg",
+    "download_url": "/static/books/ashes_and_algorithms.pdf"
+  }
+]

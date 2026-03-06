@@ -16,9 +16,8 @@ export default function PersonalityStoryScreen({ previousReads }) {
     }
   }, []);
 
-  // The video file lives in frontend/public/assets/ → served at /assets/... at runtime
-  // File: "QLexi video for Personality Story Box's Background.mp4"
-  const VIDEO_SRC = '/assets/QLexi%20video%20for%20Personality%20Story%20Box\'s%20Background.mp4';
+  // The video file lives in frontend/public/videos/ → served at /videos/... at runtime
+  const VIDEO_SRC = '/videos/qlexi_background.mp4';
 
   return (
     <section className="personality-section w-full">

@@ -1235,23 +1235,34 @@ def quantum_info():
     return info
 
 
+@app.get("/api/free-books")
+def get_free_books():
+    """Return the list of free downloadable books for the Introduction section.
+    This is separate from the recommendation dataset (books_data.json).
+    """
+    import json as _json
+    free_books_path = Path(__file__).resolve().parent / "data" / "free_books.json"
+    with open(free_books_path, encoding="utf-8") as f:
+        return _json.load(f)
+
+
+@app.get("/download/{filename}")
 @app.get("/api/v1/download/{filename}")
 async def download_book(filename: str, request: Request):
     """Serve downloadable book files (PDFs) with correct Content-Disposition header.
 
-    Files are served from frontend/dist/assets/ (populated from frontend/public/assets/).
+    Files are searched first in backend/static/books/, then in frontend/dist/assets/.
+    Example: GET /download/alice_in_wonderland.pdf
     Example: GET /api/v1/download/Building%20AI%20Agents.pdf
-
-    NOTE: Ensure PDF files are placed in frontend/public/assets/ before running
-    `npm run build` so they are included in the dist output.
     """
     # Prevent path traversal
     safe_name = Path(filename).name
     if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid filename")
 
-    # Search in frontend/dist/assets (production build) and frontend/public/assets (dev)
+    _static_books_dir = Path(__file__).resolve().parent / "static" / "books"
     candidates = [
+        _static_books_dir / safe_name,
         _FRONTEND_DIR / "assets" / safe_name,
         Path(__file__).resolve().parent.parent / "frontend" / "public" / "assets" / safe_name,
     ]
@@ -1264,10 +1275,19 @@ async def download_book(filename: str, request: Request):
     logger.info(f"📥 Download: {safe_name} from {file_path}")
     return FileResponse(
         str(file_path),
-        media_type="application/octet-stream",
+        media_type="application/pdf",
+        filename=safe_name,
         headers={"Content-Disposition": f'attachment; filename="{safe_name}"'},
     )
 
+
+# ══════════════════════════════════════════════════════════
+#  Mount backend/static/books — always available
+# ══════════════════════════════════════════════════════════
+_STATIC_BOOKS_DIR = Path(__file__).resolve().parent / "static" / "books"
+if _STATIC_BOOKS_DIR.is_dir():
+    app.mount("/static/books", StaticFiles(directory=str(_STATIC_BOOKS_DIR)), name="static-books")
+    logger.info(f"📁 Mounted /static/books → {_STATIC_BOOKS_DIR}")
 
 # ══════════════════════════════════════════════════════════
 #  Serve the built React SPA (frontend/dist) in production
@@ -1305,6 +1325,18 @@ if _FRONTEND_DIR.is_dir():
     if _assets_dir.is_dir():
         app.mount("/static/downloads", StaticFiles(directory=str(_assets_dir)), name="static-downloads")
         logger.info(f"📁 Mounted /static/downloads → {_assets_dir}")
+
+    # /images  → UI background images (copied from public/images by Vite build)
+    _images_dir = _FRONTEND_DIR / "images"
+    if _images_dir.is_dir():
+        app.mount("/images", StaticFiles(directory=str(_images_dir)), name="frontend-images")
+        logger.info(f"📁 Mounted /images → {_images_dir}")
+
+    # /videos  → video backgrounds (copied from public/videos by Vite build)
+    _videos_dir = _FRONTEND_DIR / "videos"
+    if _videos_dir.is_dir():
+        app.mount("/videos", StaticFiles(directory=str(_videos_dir)), name="frontend-videos")
+        logger.info(f"📁 Mounted /videos → {_videos_dir}")
 
     # ── SPA catch-all: serve index.html for all non-API routes ──────────────
     @app.get("/{full_path:path}")
