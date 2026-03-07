@@ -84,29 +84,34 @@ try:
 except Exception:
     book_embedding_cache = {}
 
-# Load quantum cache if present (use v2 enhanced cache)
+# Load quantum cache if present (use v2 enhanced cache).
+# On constrained instances (e.g. Render free), SKIP_ML=1 should avoid importing
+# heavy quantum/ML stack at startup.
 quantum_cache = {}
-try:
-    from services.quantum_cache_v2 import load_cache as load_quantum_cache
-    from services.quantum_cache_v2 import (
-        classical_quantum_similarity,
-        load_pca_projection,
-        cached_quantum_similarity,
-    )
-    quantum_cache = load_quantum_cache()
-    # Restore PCA projection into the quantum similarity engine
-    _pca_proj, _pca_mean = load_pca_projection()
-    if _pca_proj is not None:
-        from services.quantum_similarity_engine import (
-            _projection_matrix as _dummy,
+if not SKIP_ML:
+    try:
+        from services.quantum_cache_v2 import load_cache as load_quantum_cache
+        from services.quantum_cache_v2 import (
+            classical_quantum_similarity,
+            load_pca_projection,
+            cached_quantum_similarity,
         )
-        import services.quantum_similarity_engine as _qse
-        _qse._projection_matrix = _pca_proj
-        _qse._projection_mean = _pca_mean
-        logger.info("PCA projection restored into quantum similarity engine")
-except Exception as e:
-    logger.warning(f"Quantum cache v2 load warning: {e}")
-    quantum_cache = {}
+        quantum_cache = load_quantum_cache()
+        # Restore PCA projection into the quantum similarity engine
+        _pca_proj, _pca_mean = load_pca_projection()
+        if _pca_proj is not None:
+            from services.quantum_similarity_engine import (
+                _projection_matrix as _dummy,
+            )
+            import services.quantum_similarity_engine as _qse
+            _qse._projection_matrix = _pca_proj
+            _qse._projection_mean = _pca_mean
+            logger.info("PCA projection restored into quantum similarity engine")
+    except Exception as e:
+        logger.warning(f"Quantum cache v2 load warning: {e}")
+        quantum_cache = {}
+else:
+    logger.info("SKIP_ML set — skipping quantum cache/engine imports at startup")
 
 app = FastAPI(title="Smart Shelf AI")
 
