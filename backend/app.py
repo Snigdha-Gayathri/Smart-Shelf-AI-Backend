@@ -2,7 +2,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import os
 from pathlib import Path
 from dotenv import load_dotenv
@@ -179,28 +179,6 @@ class PromptRequest(BaseModel):
     prompt: str
 
 
-class LexiChatMessage(BaseModel):
-    role: str
-    content: str
-
-
-class LexiBookItem(BaseModel):
-    title: Optional[str] = None
-    author: Optional[str] = None
-    genre: Optional[str] = None
-    synopsis: Optional[str] = None
-    mood: Optional[str] = None
-    tone: Optional[str] = None
-    emotion_tags: Optional[List[str]] = None
-
-
-class LexiChatRequest(BaseModel):
-    message: str
-    history: List[LexiChatMessage] = Field(default_factory=list)
-    currently_reading: List[LexiBookItem] = Field(default_factory=list)
-    previous_reads: List[LexiBookItem] = Field(default_factory=list)
-
-
 class RegisterRequest(BaseModel):
     email: str
     password: str
@@ -242,11 +220,6 @@ def _get_books_dataset() -> List[Dict[str, Any]]:
             _BOOKS_DATASET = _json.load(f)
         logger.info(f"📚 Loaded {len(_BOOKS_DATASET)} books from dataset into memory")
     return _BOOKS_DATASET
-
-
-def _load_books_dataset() -> List[Dict[str, Any]]:
-    """Alias kept for backward-compat with lexi-chat. Uses cached dataset."""
-    return _get_books_dataset()
 
 
 # ── Personality Match Helpers ──────────────────────────────────────────────
@@ -371,12 +344,6 @@ def _filter_books_by_query(books: List[Dict[str, Any]], query: str) -> List[Dict
     return books
 
 
-def _tokenize_text(value: str) -> set[str]:
-    if not value:
-        return set()
-    return set(re.findall(r"\w+", value.lower()))
-
-
 def _detect_requested_book_type(prompt: str) -> Optional[str]:
     """Detect whether the user explicitly asked for a specific book type.
 
@@ -409,55 +376,6 @@ def _detect_requested_book_type(prompt: str) -> Optional[str]:
         return "fiction"
 
     return None
-
-
-def _retrieve_relevant_books(user_message: str, books: List[Dict[str, Any]], top_k: int = 5) -> List[Dict[str, Any]]:
-    query_tokens = _tokenize_text(user_message)
-    if not query_tokens:
-        return []
-
-    scored = []
-    for book in books:
-        title = book.get("title", "")
-        author = book.get("author", "")
-        genre = book.get("genre", "")
-        synopsis = book.get("synopsis", "")
-        mood = book.get("mood", "")
-        tone = book.get("tone", "")
-        tags = " ".join(book.get("emotion_tags", []) or [])
-
-        haystack = f"{title} {author} {genre} {synopsis} {mood} {tone} {tags}"
-        book_tokens = _tokenize_text(haystack)
-        if not book_tokens:
-            continue
-
-        overlap = len(query_tokens & book_tokens)
-        if overlap <= 0:
-            continue
-
-        title_author_bonus = 0
-        title_tokens = _tokenize_text(title)
-        author_tokens = _tokenize_text(author)
-        if query_tokens & title_tokens:
-            title_author_bonus += 3
-        if query_tokens & author_tokens:
-            title_author_bonus += 2
-
-        score = overlap + title_author_bonus
-        scored.append((score, book))
-
-    scored.sort(key=lambda row: row[0], reverse=True)
-    unique = []
-    seen = set()
-    for _, book in scored:
-        key = (book.get("title"), book.get("author"))
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(book)
-        if len(unique) >= top_k:
-            break
-    return unique
 
 
 # Warmup quantum emotion pipeline on startup (if available)
@@ -1097,96 +1015,6 @@ def get_analytics():
     }
 
 
-@app.post("/api/v1/lexi-chat")
-async def lexi_chat(payload: LexiChatRequest):
-    """
-    Groq-backed Lexi chat endpoint.
-    Retrieves relevant local book context first, then asks Groq to answer in Lexi's style.
-    """
-    try:
-        from services import groq_client
-
-        user_message = (payload.message or "").strip()
-        if not user_message:
-            return {"error": "message is required", "reply": ""}
-
-        if not groq_client.is_configured():
-            raise HTTPException(status_code=503, detail="GROQ_API_KEY is not configured on the backend")
-
-        books = _load_books_dataset()
-        retrieved = _retrieve_relevant_books(user_message, books, top_k=5)
-
-        normalized_retrieved = [
-            {
-                "title": b.get("title"),
-                "author": b.get("author"),
-                "genre": b.get("genre"),
-                "synopsis": b.get("synopsis"),
-                "mood": b.get("mood"),
-                "tone": b.get("tone"),
-                "emotion_tags": b.get("emotion_tags", []),
-            }
-            for b in retrieved
-        ]
-
-        def _to_dict(item: Any) -> Dict[str, Any]:
-            if hasattr(item, "model_dump"):
-                return item.model_dump()
-            if hasattr(item, "dict"):
-                return item.dict()
-            return dict(item)
-
-        user_books_context = {
-            "currently_reading": [_to_dict(item) for item in payload.currently_reading[:10]],
-            "previous_reads": [_to_dict(item) for item in payload.previous_reads[:20]],
-        }
-
-        system_prompt = (
-            "You are Q Lexi, a friendly and modern book assistant. "
-            "Answer with real, accurate book information based on the provided retrieved context. "
-            "If the requested fact is missing from context, say you don't have that detail instead of inventing it. "
-            "Style: warm, slightly playful, concise, supportive. "
-            "Always prefer factual correctness over creativity. "
-            "When possible, mention title and author clearly."
-        )
-
-        context_prompt = (
-            f"User message:\n{user_message}\n\n"
-            f"Retrieved books context (authoritative):\n{normalized_retrieved}\n\n"
-            f"User bookshelf context:\n{user_books_context}\n\n"
-            "Instructions: give the best answer grounded in the retrieved context. "
-            "If user asks for recommendations while chatting, suggest 2-4 relevant titles from retrieved books."
-        )
-
-        prior_history = payload.history[-8:] if payload.history else []
-        messages = [{"role": "system", "content": system_prompt}]
-        for msg in prior_history:
-            role = (msg.role or "user").lower()
-            if role not in {"user", "assistant", "system"}:
-                role = "user"
-            messages.append({"role": role, "content": msg.content})
-        messages.append({"role": "user", "content": context_prompt})
-
-        response = groq_client.chat_completion(messages=messages, temperature=0.5)
-        choice = (response.get("choices") or [{}])[0]
-        message = (choice.get("message") or {})
-        reply = (message.get("content") or "").strip()
-
-        if not reply:
-            reply = "I couldn't generate a response right now. Try asking about a specific title or author."
-
-        return {
-            "reply": reply,
-            "retrieved_books": normalized_retrieved,
-            "model": groq_client.GROQ_MODEL,
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Lexi chat error: {e}")
-        raise HTTPException(status_code=500, detail=f"Lexi chat failed: {e}")
-
-
 @app.post("/api/v1/analyze_emotion")
 async def analyze_emotion(payload: PromptRequest):
     """
@@ -1241,14 +1069,28 @@ def quantum_info():
 
 
 @app.get("/api/free-books")
-def get_free_books():
+def get_free_books(request: Request):
     """Return the list of free downloadable books for the Introduction section.
     This is separate from the recommendation dataset (books_data.json).
     """
     import json as _json
     free_books_path = Path(__file__).resolve().parent / "data" / "free_books.json"
     with open(free_books_path, encoding="utf-8") as f:
-        return _json.load(f)
+        books = _json.load(f)
+
+    # Always return backend-hosted download links so clients receive the
+    # original PDF via the dedicated /download endpoint (attachment headers).
+    base_url = str(request.base_url).rstrip("/")
+    normalized_books = []
+    for book in books:
+        row = dict(book)
+        raw_url = str(row.get("download_url", "") or "")
+        file_name = Path(raw_url).name
+        if file_name:
+            row["download_url"] = f"{base_url}/download/{file_name}"
+        normalized_books.append(row)
+
+    return normalized_books
 
 
 @app.get("/download/{filename}")

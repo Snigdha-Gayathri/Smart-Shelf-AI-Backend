@@ -78,7 +78,6 @@ This repo includes a `render.yaml` blueprint configured for stable first deploys
 1. Push the repository to GitHub.
 2. In Render, create a new Blueprint service from the repo.
 3. Ensure these env vars are set in Render (as needed by your features):
-  - `GROQ_API_KEY`
   - `MONGODB_URI`
   - `JWT_SECRET`
   - `OPENAI_API_KEY`

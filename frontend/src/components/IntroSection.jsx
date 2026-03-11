@@ -53,6 +53,12 @@ export default function IntroSection() {
   )
 }
 
+function resolveDownloadUrl(downloadUrl) {
+  if (!downloadUrl) return '#'
+  if (/^https?:\/\//i.test(downloadUrl)) return downloadUrl
+  return `${API_BASE}${downloadUrl.startsWith('/') ? '' : '/'}${downloadUrl}`
+}
+
 /* ═══════════════════════════════════════════════════════════
    Extracted content component — shared by mobile & desktop
    ═══════════════════════════════════════════════════════════ */
@@ -164,7 +170,7 @@ they match your mood, your mindset, and your heart 💫`}
 
                   {/* Download anchor */}
                   <a
-                    href={book.download_url}
+                    href={resolveDownloadUrl(book.download_url)}
                     download
                     className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105 no-underline block"
                     style={{
