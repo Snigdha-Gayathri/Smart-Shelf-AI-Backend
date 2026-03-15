@@ -1,13 +1,14 @@
 import React, { useState } from 'react'
 
-const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : 'http://127.0.0.1:8000')
+const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : '')
 
 export default function Settings({ 
   theme, 
   setTheme, 
   onLogout, 
   onDeleteAccount,
-  userEmail 
+  userEmail,
+  username,
 }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -25,6 +26,10 @@ export default function Settings({
   const [pwError, setPwError] = useState('')
   const [pwInfo, setPwInfo] = useState('')
   const [otpHelperLoading, setOtpHelperLoading] = useState(false)
+  const [demoOtp, setDemoOtp] = useState('')
+  const [currentPass, setCurrentPass] = useState('')
+
+  const passwordRuleMessage = 'Password must contain: 8-16 characters, letters, numbers, and at least one special character.'
 
   const resetPasswordFlow = () => {
     setPasswordStep('otp')
@@ -34,6 +39,16 @@ export default function Settings({
     setConfirmPass('')
     setPwError('')
     setPwInfo('')
+    setDemoOtp('')
+    setCurrentPass('')
+  }
+
+  const isStrongPassword = (pw) => {
+    if (!pw || pw.length < 8 || pw.length > 16) return false
+    if (!/[A-Za-z]/.test(pw)) return false
+    if (!/\d/.test(pw)) return false
+    if (!/[^A-Za-z0-9]/.test(pw)) return false
+    return true
   }
 
   const handleProfilePictureUpload = (e) => {
@@ -69,7 +84,8 @@ export default function Settings({
   const requestOtp = async () => {
     setPwError('')
     setPwInfo('')
-    if (!userEmail) {
+    setDemoOtp('')
+    if (!username) {
       setPwError('You must be logged in to change password')
       return
     }
@@ -77,11 +93,16 @@ export default function Settings({
       const res = await fetch(`${API_BASE}/auth/request-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: userEmail.trim().toLowerCase() })
+        body: JSON.stringify({ username: username.trim().toLowerCase() })
       })
       const data = await res.json()
       if (data.status === 'ok') {
-        setPwInfo(data.message || 'OTP generated in backend terminal automatically. Enter it here to continue.')
+        if (data.otp) {
+          setDemoOtp(data.otp)
+          setPwInfo(`Demo OTP: ${data.otp}. Enter this OTP to verify.`)
+        } else {
+          setPwInfo(data.message || 'OTP generated. Enter it here to continue.')
+        }
       } else {
         setPwError(data.error || 'Failed to request OTP')
       }
@@ -101,7 +122,7 @@ export default function Settings({
       const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: userEmail.trim().toLowerCase(), otp: otpInput.trim() })
+        body: JSON.stringify({ username: (username || '').trim().toLowerCase(), otp: otpInput.trim() })
       })
       const data = await res.json()
       if (data.status === 'ok' && data.token) {
@@ -128,10 +149,10 @@ export default function Settings({
         return
       }
 
-      const expected = (userEmail || '').trim().toLowerCase()
-      const actual = (data.phone || '').trim().toLowerCase()
+      const expected = (username || '').trim().toLowerCase()
+      const actual = (data.username || '').trim().toLowerCase()
       if (expected && actual && expected !== actual) {
-        setPwError('Latest OTP belongs to another email. Generate OTP again for your account.')
+        setPwError('Latest OTP belongs to another username. Generate OTP again for your account.')
         return
       }
 
@@ -147,8 +168,12 @@ export default function Settings({
   const submitNewPassword = async () => {
     setPwError('')
     setPwInfo('')
-    if (!newPass || newPass.length < 8 || !/[A-Za-z]/.test(newPass) || !/\d/.test(newPass)) {
-      setPwError('Password must be at least 8 characters and include letters and numbers')
+    if (!currentPass) {
+      setPwError('Current password is required')
+      return
+    }
+    if (!isStrongPassword(newPass)) {
+      setPwError(passwordRuleMessage)
       return
     }
     if (newPass !== confirmPass) {
@@ -159,12 +184,12 @@ export default function Settings({
       const res = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, new_password: newPass, token: otpToken })
+        body: JSON.stringify({ username, current_password: currentPass, new_password: newPass, token: otpToken })
       })
       const data = await res.json()
       if (data.status === 'ok') {
         setPasswordStep('success')
-        setPwInfo('Password updated. Use this new password for your next login.')
+        setPwInfo(data.message || 'Password successfully updated.')
       } else {
         setPwError(data.error || 'Failed to change password')
       }
@@ -247,6 +272,7 @@ export default function Settings({
         </div>
 
         <div className="text-sm text-slate-600 dark:text-slate-400">
+          <div><span className="font-medium">Username:</span> {username || 'Not logged in'}</div>
           <span className="font-medium">Email:</span> {userEmail || 'Not logged in'}
         </div>
       </section>
@@ -385,7 +411,7 @@ export default function Settings({
 
             {passwordStep === 'otp' && (
               <div className="space-y-4">
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Email: {userEmail}</label>
+                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Username: {username}</label>
                 <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter OTP</label>
                 <input
                   type="text"
@@ -394,6 +420,12 @@ export default function Settings({
                   maxLength={6}
                   className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
                 />
+                {demoOtp && (
+                  <div className="rounded-lg border border-emerald-300/60 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">
+                    Demo OTP: {demoOtp}<br />
+                    Enter this OTP to verify.
+                  </div>
+                )}
                 <button
                   onClick={fetchLatestOtp}
                   disabled={otpHelperLoading}
@@ -413,13 +445,23 @@ export default function Settings({
 
             {passwordStep === 'password' && (
               <div className="space-y-4">
+                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Current Password</label>
+                <input
+                  type="password"
+                  value={currentPass}
+                  onChange={(e) => setCurrentPass(e.target.value)}
+                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
+                />
                 <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter New Password</label>
                 <input
                   type="password"
                   value={newPass}
                   onChange={(e) => setNewPass(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
+                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border ${newPass && !isStrongPassword(newPass) ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'} bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue`}
                 />
+                {newPass && !isStrongPassword(newPass) && (
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{passwordRuleMessage}</p>
+                )}
                 <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Confirm New Password</label>
                 <input
                   type="password"
@@ -433,8 +475,8 @@ export default function Settings({
                   <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
                   <button
                     onClick={submitNewPassword}
-                    disabled={!newPass || newPass !== confirmPass}
-                    className={`flex-1 px-4 py-2 sm:py-2.5 rounded-lg font-medium transition text-sm sm:text-base ${(!newPass || newPass !== confirmPass) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-cool-blue text-white hover:bg-cool-accent'}`}
+                    disabled={!currentPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)}
+                    className={`flex-1 px-4 py-2 sm:py-2.5 rounded-lg font-medium transition text-sm sm:text-base ${(!currentPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-cool-blue text-white hover:bg-cool-accent'}`}
                   >
                     Update Password
                   </button>

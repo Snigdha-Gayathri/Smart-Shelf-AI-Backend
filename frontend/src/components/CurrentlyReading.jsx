@@ -41,6 +41,24 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
               </span>
             }
           >
+            <div className="w-full text-xs text-slate-300 mb-2">
+              Progress: {isFinished ? '100%' : 'In progress'}
+            </div>
+
+            {book.buy_link && (
+              <div className="w-full mb-2">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    window.open(book.buy_link, '_blank', 'noopener,noreferrer')
+                  }}
+                  className="w-full px-2 py-1.5 text-xs rounded-md bg-green-600 hover:bg-green-700 text-white font-medium transition focus:outline-none focus:ring-2 focus:ring-green-400"
+                >
+                  Buy Online
+                </button>
+              </div>
+            )}
+
             {/* Status control */}
             <div className="w-full pt-2 border-t border-slate-200 dark:border-slate-700">
               <select

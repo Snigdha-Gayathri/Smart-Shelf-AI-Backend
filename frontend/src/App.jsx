@@ -22,7 +22,7 @@ import EducationalInsightPanel from './components/EducationalInsightPanel';
 import CategoryStyledBookCard from './components/CategoryStyledBookCard';
 import SkeletonLoader from './components/SkeletonLoader';
 
-const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : 'http://127.0.0.1:8000')
+const API_BASE = (import.meta.env.VITE_BACKEND_URL || '').trim() || (import.meta.env.PROD ? window.location.origin : '')
 
 export default function App({ clerk = { enabled: false, isLoaded: false, isSignedIn: false, user: null, signOut: null } }) {
   const clerkEnabled = Boolean(clerk?.enabled)
@@ -77,6 +77,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('introduction');
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     document.documentElement.className = theme;
@@ -99,7 +100,16 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       return
     }
 
+    // Only clear auth if it was NOT set by local login/register
+    // (local auth uses authMethod: 'local' flag in localStorage)
     if (auth) {
+      try {
+        const stored = JSON.parse(localStorage.getItem('auth') || 'null')
+        if (stored?.authMethod === 'local') {
+          // Preserve local auth — user signed in via username/password, not Clerk
+          return
+        }
+      } catch { /* ignore parse errors */ }
       localStorage.removeItem('auth')
       setAuth(null)
       setMenuOpen(false)
@@ -174,14 +184,24 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
   // Handle logout - do NOT delete persisted user data (only clear in-memory state)
   function handleLogout() {
+    setIsLoggingOut(true);
+    const finish = () => {
+      localStorage.removeItem('auth');
+      setAuth(null);
+      setMenuOpen(false);
+      setActiveSection('home');
+      setRecommendations([]);
+      setIsLoggingOut(false);
+    };
+
     if (clerkEnabled) {
-      clerk?.signOut?.().catch(() => {})
+      Promise.resolve(clerk?.signOut?.()).catch(() => {}).finally(() => {
+        window.setTimeout(finish, 160);
+      });
+      return;
     }
-    localStorage.removeItem('auth');
-    setAuth(null);
-    setMenuOpen(false);
-    setActiveSection('home');
-    setRecommendations([]);
+
+    window.setTimeout(finish, 160);
   }
 
   // Handle delete account - explicitly remove all persisted user data
@@ -194,7 +214,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         headers: { 
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email: auth.user.email })
+        body: JSON.stringify({ username: auth.user.username || auth.user.email })
       });
       
       if (res.ok) {
@@ -228,11 +248,15 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         title: book.title,
         author: book.author,
         coverImage: book.cover,
+        cover: book.cover,
         genre: book.genre,
+        synopsis: book.synopsis,
         emotion_tags: book.emotion_tags || book.tags || [],
         tags: book.tags || [],
         type: 'educational',
         eduStatus: 'learning',
+        buy_link: book.buy_link,
+        reading_insights: book.reading_insights,
         pacing: book.pacing,
         tone: book.tone,
       };
@@ -249,10 +273,14 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         title: book.title,
         author: book.author,
         coverImage: book.cover,
+        cover: book.cover,
         genre: book.genre,
+        synopsis: book.synopsis,
         emotion_tags: book.emotion_tags || book.tags || [],
         tags: book.tags || [],
         type: book.type,
+        buy_link: book.buy_link,
+        reading_insights: book.reading_insights,
         status: 'reading'
       };
       setCurrentlyReading(prev => [...prev, readingBook]);
@@ -681,9 +709,17 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     return () => { mounted = false };
   }, []);
 
+  if (!auth) {
+    return (
+      <div className="w-full h-screen overflow-hidden">
+        <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
+      </div>
+    );
+  }
+
   return (
     <div 
-      className={`app-layout w-full h-screen overflow-hidden font-sans transition-colors duration-500 ${theme === 'dark' ? 'bg-black text-white' : 'text-slate-800'}`} 
+      className={`app-layout w-full h-screen overflow-hidden font-sans transition-all duration-200 ${theme === 'dark' ? 'bg-black text-white' : 'text-slate-800'} ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`} 
       style={{ backgroundColor: theme === 'dark' ? '#000000' : '#FAF7F2' }}
     >
       {auth && (
@@ -698,13 +734,6 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       <main className="main-content flex-1 min-w-0 h-screen px-3 sm:px-6 md:px-8 py-4 sm:py-8 md:py-12 transition-all duration-300 ease-in-out overflow-y-auto">
         <div className="w-full max-w-6xl mx-auto">
         <HeaderSection theme={theme} />
-        {!auth && (
-          <>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4 sm:mb-6 text-primary dark:text-primary">Welcome to SmartShelf AI</h2>
-            <p className="text-on-light mb-6 text-sm sm:text-base">Please login or create an account to continue.</p>
-            <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
-          </>
-        )}
         
         {/* Introduction Section - Full-screen dedicated intro view */}
         {auth && activeSection === 'introduction' && (
@@ -733,6 +762,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
                 <Recommendations 
                   recommendations={recommendations} 
                   onAddToCurrentlyReading={handleAddToCurrentlyReading}
+                  currentUsername={auth?.user?.username}
                 />
               )}
             </section>
@@ -869,6 +899,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               onLogout={handleLogout}
               onDeleteAccount={handleDeleteAccount}
               userEmail={auth?.user?.email}
+              username={auth?.user?.username}
             />
           </section>
         )}

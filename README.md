@@ -66,24 +66,113 @@ The frontend will be available at `http://localhost:5173`
 
 ## ☁️ Deploy on Render
 
-This repo includes a `render.yaml` blueprint configured for stable first deploys:
+This project can be deployed on Render in two ways.
 
-- Builds backend and frontend in one service
-- Serves built SPA from FastAPI (`frontend/dist`)
-- Uses `SKIP_ML=1` by default to avoid startup failures from heavy model downloads
-- Uses `/health` for Render health checks
+### Option 1: Single Render Web Service from this monorepo
 
-### Steps
+Use this if you want one Render service where FastAPI serves the built React app.
 
-1. Push the repository to GitHub.
-2. In Render, create a new Blueprint service from the repo.
-3. Ensure these env vars are set in Render (as needed by your features):
-  - `MONGODB_URI`
-  - `JWT_SECRET`
-  - `OPENAI_API_KEY`
-4. Deploy.
+- Runtime: `Python`
+- Root directory: repo root
+- Build command:
 
-After a successful first deploy, you can set `SKIP_ML=0` only if your plan/resources can handle model loading.
+```bash
+cd backend
+pip install --upgrade pip
+pip install -r requirements.txt
+cd ../frontend
+npm ci --no-audit --no-fund
+npm run build
+```
+
+- Start command:
+
+```bash
+cd backend && python -m gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 180 --workers 1
+```
+
+- Health check path: `/health`
+
+- Recommended environment variables:
+  - `PYTHON_VERSION=3.11.6`
+  - `NODE_VERSION=20`
+  - `SKIP_ML=1`
+  - `PYTHONUNBUFFERED=1`
+  - `JWT_SECRET=<strong-random-secret>`
+  - `MONGODB_URI=<optional>`
+  - `OPENAI_API_KEY=<optional>`
+  - `CLERK_SECRET_KEY=<optional>`
+  - `GOOGLE_CLIENT_ID=<optional>`
+  - `GOOGLE_CLIENT_SECRET=<optional>`
+
+The root `render.yaml` already contains this setup.
+
+### Option 2: Split deployment with separate frontend and backend repos
+
+Use this if you want:
+
+- one Render `Web Service` for the backend repo
+- one Render `Static Site` for the frontend repo
+
+#### Backend repo on Render
+
+- Service type: `Web Service`
+- Runtime: `Python`
+- Root directory: repo root of the backend repository
+- Build command:
+
+```bash
+pip install --upgrade pip && pip install -r requirements.txt
+```
+
+- Start command:
+
+```bash
+python -m gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 180 --workers 1
+```
+
+- Health check path: `/health`
+
+- Backend environment variables:
+  - `PYTHON_VERSION=3.11.6`
+  - `SKIP_ML=1`
+  - `PYTHONUNBUFFERED=1`
+  - `JWT_SECRET=<strong-random-secret>`
+  - `MONGODB_URI=<optional>`
+  - `OPENAI_API_KEY=<optional>`
+  - `CLERK_SECRET_KEY=<optional>`
+  - `GOOGLE_CLIENT_ID=<optional>`
+  - `GOOGLE_CLIENT_SECRET=<optional>`
+
+#### Frontend repo on Render
+
+- Service type: `Static Site`
+- Root directory: repo root of the frontend repository
+- Build command:
+
+```bash
+npm ci && npm run build
+```
+
+- Publish directory:
+
+```bash
+dist
+```
+
+- Frontend environment variables:
+  - `NODE_VERSION=20`
+  - `VITE_BACKEND_URL=https://<your-backend-service>.onrender.com`
+  - `VITE_CLERK_PUBLISHABLE_KEY=<optional>`
+
+For the split frontend deployment, SPA routing is handled by the `_redirects` file in `frontend/public`.
+
+### Render notes
+
+- Start with `SKIP_ML=1` on Render unless you know your plan can handle transformer and quantum-model startup costs.
+- If you later enable full ML, set `SKIP_ML=0` and expect slower cold starts.
+- The backend already exposes both `/health` and `/ready`.
+- The frontend uses `VITE_BACKEND_URL` when deployed separately and same-origin requests when deployed together.
 
 ## 📡 API Endpoints
 

@@ -68,6 +68,7 @@ export default function CategoryStyledBookCard({
   book,
   index = 0,
   children,
+  titleActions,
   statusBadge,
   onClick,
   forceDodgerOutline = false,
@@ -75,7 +76,8 @@ export default function CategoryStyledBookCard({
   const [imgError, setImgError] = useState(false)
   const [hovered, setHovered] = useState(false)
 
-  const type = book.type || 'fiction'
+  const rawType = String(book.type || '').trim().toLowerCase()
+  const type = rawType === 'self_help' || rawType === 'self help' ? 'self-help' : (rawType || 'fiction')
   const t = themes[type] || themes.fiction
   const isDark = document.documentElement.classList.contains('dark')
   const bgImage = backgroundImages[type] || backgroundImages.fiction
@@ -167,6 +169,12 @@ export default function CategoryStyledBookCard({
           </h3>
 
           <p className="text-xs text-slate-300 mb-2 line-clamp-1">{book.author}</p>
+
+          {titleActions && (
+            <div className="mb-2 w-fit">
+              {titleActions}
+            </div>
+          )}
 
           {/* Genre tag */}
           {book.genre && (
