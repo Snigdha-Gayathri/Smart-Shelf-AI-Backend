@@ -1301,4 +1301,14 @@ if _FRONTEND_DIR.is_dir():
 
     logger.info(f"📦 Serving frontend SPA from {_FRONTEND_DIR}")
 else:
+    @app.get("/")
+    def root_status():
+        return {
+            "service": "Smart Shelf AI Backend",
+            "status": "ok",
+            "health": "/health",
+            "ready": "/ready",
+            "docs": "/docs",
+        }
+
     logger.info("ℹ️  No frontend/dist found — run 'npm run build' in frontend/ to enable SPA serving")
