@@ -66,7 +66,7 @@ export const userStorage = {
   deleteUser: (userId) => {
     if (!userId) return;
     try {
-      const dataTypes = ['currentlyReading', 'previousReads', 'userFeedback', 'personalityProfile', 'annualWrapped', 'educationalBooks'];
+      const dataTypes = ['currentlyReading', 'previousReads', 'userFeedback', 'personalityProfile', 'annualWrapped', 'educationalBooks', 'reviews', 'userPreferenceModel', 'reviewInsights'];
       dataTypes.forEach(type => {
         const key = getStorageKey(userId, type);
         localStorage.removeItem(key);
@@ -81,6 +81,7 @@ export const userStorage = {
         }
       }
       keysToRemove.forEach(k => localStorage.removeItem(k));
+      localStorage.removeItem(`smartshelf_user_settings_${userId}`);
       console.log(`Deleted all persisted data for user ${userId}`);
     } catch (e) {
       console.error(`Failed to delete user data for ${userId}:`, e);

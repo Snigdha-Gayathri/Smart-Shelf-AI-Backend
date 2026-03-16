@@ -327,6 +327,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         ))}
       </div>
 
+      <div className="auth-main-grid">
       <motion.div
         className="auth-col-left"
         initial={{ opacity: 0, x: -20 }}
@@ -498,6 +499,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
           </form>
         </div>
       </motion.div>
+      </div>
       {/* Forgot Password Modal */}
       {showForgotModal && (
         <div className="auth-forgot-overlay" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>

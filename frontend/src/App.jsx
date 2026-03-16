@@ -22,8 +22,40 @@ import EducationalInsightPanel from './components/EducationalInsightPanel';
 import CategoryStyledBookCard from './components/CategoryStyledBookCard';
 import SkeletonLoader from './components/SkeletonLoader';
 import { getApiBase } from './utils/apiBase';
+import ThemeToggle from './components/ThemeToggle';
+import CursorParticleCanvas from './components/CursorParticleCanvas';
+import SpaceBackground from './components/SpaceBackground';
+import AuthorDashboard from './components/AuthorDashboard';
+import { loadUserSettings, updateSetting } from './utils/userSettings';
+import {
+  analyzeReviewKeywords,
+  scoreRecommendationSignals,
+  generateRecommendationExplanation,
+  generateReadingProfile,
+} from './utils/reviewIntelligence';
 
 const API_BASE = getApiBase()
+const DEFAULT_REVIEW_INSIGHTS = {
+  topDetectedThemes: [],
+  preferredStorytellingStyle: [],
+  reviewWordCloud: [],
+  readingProfile: null,
+};
+const DEFAULT_USER_FEEDBACK = {
+  likedGenres: new Map(),
+  dislikedGenres: new Map(),
+  likedTags: new Map(),
+  dislikedTags: new Map(),
+};
+
+function getSystemThemePreference() {
+  if (typeof window === 'undefined' || !window.matchMedia) return 'light';
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function resolveThemePreference(themePreference) {
+  return themePreference === 'system' ? getSystemThemePreference() : themePreference;
+}
 
 export default function App({ clerk = { enabled: false, isLoaded: false, isSignedIn: false, user: null, signOut: null } }) {
   const clerkEnabled = Boolean(clerk?.enabled)
@@ -31,7 +63,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const isSignedIn = Boolean(clerk?.isSignedIn)
   const clerkUser = clerk?.user || null
 
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [userSettings, setUserSettings] = useState(() => loadUserSettings('guest'));
+  const [theme, setTheme] = useState(() => resolveThemePreference(loadUserSettings('guest').theme));
   const [auth, setAuth] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('auth') || 'null');
@@ -53,24 +86,27 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [userFeedback, setUserFeedback] = useState(() => {
     if (!auth?.user?.id) {
       return {
-        likedGenres: new Map(),
-        dislikedGenres: new Map(),
-        likedTags: new Map(),
-        dislikedTags: new Map()
+        ...DEFAULT_USER_FEEDBACK
       };
     }
-    return userStorage.load(auth.user.id, 'userFeedback', {
-      likedGenres: new Map(),
-      dislikedGenres: new Map(),
-      likedTags: new Map(),
-      dislikedTags: new Map()
-    });
+    return userStorage.load(auth.user.id, 'userFeedback', DEFAULT_USER_FEEDBACK);
   });
   const [personalityProfile, setPersonalityProfile] = useState(() =>
     auth?.user?.id ? userStorage.load(auth.user.id, 'personalityProfile', null) : null
   );
   const [annualWrapped, setAnnualWrapped] = useState(() =>
     auth?.user?.id ? userStorage.load(auth.user.id, 'annualWrapped', null) : null
+  );
+  const [reviews, setReviews] = useState(() =>
+    auth?.user?.id ? userStorage.load(auth.user.id, 'reviews', []) : []
+  );
+  const [reviewInsights, setReviewInsights] = useState(() =>
+    auth?.user?.id
+      ? userStorage.load(auth.user.id, 'reviewInsights', DEFAULT_REVIEW_INSIGHTS)
+      : DEFAULT_REVIEW_INSIGHTS
+  );
+  const [userPreferenceModel, setUserPreferenceModel] = useState(() =>
+    auth?.user?.id ? userStorage.load(auth.user.id, 'userPreferenceModel', {}) : {}
   );
   
   const [recommendations, setRecommendations] = useState([]);
@@ -81,9 +117,61 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
+    if (window.location.pathname === '/author-dashboard') {
+      setActiveSection('author_dashboard')
+    }
+  }, [])
+
+  useEffect(() => {
     document.documentElement.className = theme;
     localStorage.setItem('theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    const settingsOwner = auth?.user?.id || 'guest';
+    setUserSettings(loadUserSettings(settingsOwner));
+  }, [auth?.user?.id]);
+
+  useEffect(() => {
+    const applyResolvedTheme = () => {
+      setTheme(resolveThemePreference(userSettings.theme));
+    };
+
+    applyResolvedTheme();
+
+    if (userSettings.theme !== 'system' || typeof window === 'undefined' || !window.matchMedia) {
+      return undefined;
+    }
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleThemeChange = () => applyResolvedTheme();
+    if (mediaQuery.addEventListener) {
+      mediaQuery.addEventListener('change', handleThemeChange);
+      return () => mediaQuery.removeEventListener('change', handleThemeChange);
+    }
+    mediaQuery.addListener(handleThemeChange);
+    return () => mediaQuery.removeListener(handleThemeChange);
+  }, [userSettings.theme]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      if (window.location.pathname === '/author-dashboard') {
+        setActiveSection('author_dashboard')
+      } else if (activeSection === 'author_dashboard') {
+        setActiveSection('home')
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [activeSection])
+
+  useEffect(() => {
+    if (!auth) return
+    const targetPath = activeSection === 'author_dashboard' ? '/author-dashboard' : '/'
+    if (window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath)
+    }
+  }, [activeSection, auth])
 
   useEffect(() => {
     if (!clerkEnabled || !isClerkLoaded) return
@@ -161,6 +249,78 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     }
   }, [annualWrapped, auth?.user?.id]);
 
+  // Persist reviews + review intelligence to storage
+  useEffect(() => {
+    if (auth?.user?.id) {
+      userStorage.save(auth.user.id, 'reviews', reviews)
+      userStorage.save(auth.user.id, 'reviewInsights', reviewInsights)
+      userStorage.save(auth.user.id, 'userPreferenceModel', userPreferenceModel)
+    }
+  }, [reviews, reviewInsights, userPreferenceModel, auth?.user?.id])
+
+  // Recompute review intelligence model whenever reviews change
+  useEffect(() => {
+    if (!userSettings.reviewIntelligence) {
+      setUserPreferenceModel({})
+      setReviewInsights(DEFAULT_REVIEW_INSIGHTS)
+      return
+    }
+
+    const resetCutoff = userSettings.lastRecommendationResetAt
+      ? new Date(userSettings.lastRecommendationResetAt).getTime()
+      : 0
+    const sourceReviews = reviews.filter((review) => {
+      const ts = new Date(review.updated_at || review.created_at || 0).getTime()
+      return !resetCutoff || ts > resetCutoff
+    })
+
+    const analyzed = analyzeReviewKeywords(sourceReviews)
+    const profile = generateReadingProfile({
+      reviews: sourceReviews,
+      userPreferenceModel: analyzed.userPreferenceModel,
+      genrePreferenceScores: analyzed.genrePreferenceScores,
+      topDetectedThemes: analyzed.topDetectedThemes,
+      preferredStorytellingStyle: analyzed.preferredStorytellingStyle,
+    })
+    setUserPreferenceModel({
+      userPreferenceModel: analyzed.userPreferenceModel,
+      genrePreferenceScores: analyzed.genrePreferenceScores,
+    })
+    setReviewInsights({
+      topDetectedThemes: analyzed.topDetectedThemes,
+      preferredStorytellingStyle: analyzed.preferredStorytellingStyle,
+      reviewWordCloud: analyzed.reviewWordCloud,
+      readingProfile: profile,
+    })
+  }, [reviews, userSettings.reviewIntelligence, userSettings.lastRecommendationResetAt])
+
+  // Sync user reviews from backend file-backed store (best effort)
+  useEffect(() => {
+    if (!auth?.user?.username) return
+    let mounted = true
+    async function loadUserReviews() {
+      try {
+        const res = await fetch(`${API_BASE}/api/v1/reviews?username=${encodeURIComponent(auth.user.username)}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!mounted) return
+        if (Array.isArray(data?.reviews) && data.reviews.length) {
+          const normalized = data.reviews.map((r, idx) => ({
+            ...r,
+            review_id: r.review_id || `${r.created_at || ''}-${r.book || ''}-${idx}`,
+          }))
+          setReviews(normalized)
+        }
+      } catch {
+        // fallback to local persisted reviews only
+      }
+    }
+    loadUserReviews()
+    return () => {
+      mounted = false
+    }
+  }, [auth?.user?.username])
+
   // Handle successful authentication - hydrate persisted user data
   function handleAuthSuccess(a){
     setAuth(a);
@@ -169,17 +329,17 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     }
     // Load persisted user data from storage after successful login
     if (a?.user?.id) {
+      const persistedSettings = loadUserSettings(a.user.id)
+      setUserSettings(persistedSettings)
       setCurrentlyReading(userStorage.load(a.user.id, 'currentlyReading', []));
       setEducationalBooks(userStorage.load(a.user.id, 'educationalBooks', []));
       setPreviousReads(userStorage.load(a.user.id, 'previousReads', []));
-      setUserFeedback(userStorage.load(a.user.id, 'userFeedback', {
-        likedGenres: new Map(),
-        dislikedGenres: new Map(),
-        likedTags: new Map(),
-        dislikedTags: new Map()
-      }));
+      setUserFeedback(userStorage.load(a.user.id, 'userFeedback', DEFAULT_USER_FEEDBACK));
       setPersonalityProfile(userStorage.load(a.user.id, 'personalityProfile', null));
       setAnnualWrapped(userStorage.load(a.user.id, 'annualWrapped', null));
+      setReviews(userStorage.load(a.user.id, 'reviews', []));
+      setReviewInsights(userStorage.load(a.user.id, 'reviewInsights', DEFAULT_REVIEW_INSIGHTS));
+      setUserPreferenceModel(userStorage.load(a.user.id, 'userPreferenceModel', {}));
     }
   }
 
@@ -189,6 +349,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     const finish = () => {
       localStorage.removeItem('auth');
       setAuth(null);
+      setUserSettings(loadUserSettings('guest'));
       setMenuOpen(false);
       setActiveSection('home');
       setRecommendations([]);
@@ -373,6 +534,110 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       likedTags: prev.likedTags,
       dislikedTags: updateFeedbackMap(prev.dislikedTags, fullBook.emotion_tags || fullBook.tags || [])
     }));
+  }
+
+  async function persistReviewToBackend(reviewEntry) {
+    try {
+      await fetch(`${API_BASE}/api/v1/reviews`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reviewEntry),
+      })
+    } catch {
+      // Keep local review data even if backend persistence fails
+    }
+  }
+
+  async function updateReviewInBackend(reviewId, payload) {
+    try {
+      await fetch(`${API_BASE}/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+    } catch {
+      // keep local update even if backend update fails
+    }
+  }
+
+  async function deleteReviewInBackend(reviewId) {
+    try {
+      await fetch(`${API_BASE}/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
+        method: 'DELETE',
+      })
+    } catch {
+      // keep local delete even if backend delete fails
+    }
+  }
+
+  // Handle transition from currently reading -> finished with rating + review
+  function handleSubmitFinishedReview(book, rating, reviewText) {
+    const fullBook = currentlyReading.find((b) => b.id === book.id)
+    if (!fullBook) return
+
+    const finishedAt = new Date().toISOString()
+    const liked = rating >= 4 ? true : rating <= 2 ? false : null
+
+    const finishedBook = {
+      ...fullBook,
+      status: 'finished',
+      finishedAt,
+      liked,
+      rating,
+      review: reviewText,
+    }
+
+    setPreviousReads((prev) => [...prev, finishedBook])
+    setCurrentlyReading((prev) => prev.filter((b) => b.id !== book.id))
+
+    const reviewId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+    const reviewEntry = {
+      review_id: reviewId,
+      username: auth?.user?.username || auth?.user?.email || '',
+      bookId: fullBook.id,
+      title: fullBook.title,
+      bookTitle: fullBook.title,
+      book: fullBook.title,
+      author: fullBook.author,
+      genre: fullBook.genre,
+      rating,
+      review: reviewText || '',
+      created_at: finishedAt,
+    }
+    setReviews((prev) => [...prev, reviewEntry])
+    persistReviewToBackend(reviewEntry)
+
+    if (liked === true) {
+      setUserFeedback((prev) => ({
+        likedGenres: updateFeedbackMap(prev.likedGenres, [fullBook.genre]),
+        dislikedGenres: prev.dislikedGenres,
+        likedTags: updateFeedbackMap(prev.likedTags, fullBook.emotion_tags || fullBook.tags || []),
+        dislikedTags: prev.dislikedTags,
+      }))
+    } else if (liked === false) {
+      setUserFeedback((prev) => ({
+        likedGenres: prev.likedGenres,
+        dislikedGenres: updateFeedbackMap(prev.dislikedGenres, [fullBook.genre]),
+        likedTags: prev.likedTags,
+        dislikedTags: updateFeedbackMap(prev.dislikedTags, fullBook.emotion_tags || fullBook.tags || []),
+      }))
+    }
+  }
+
+  function handleUpdateReview(reviewId, rating, reviewText) {
+    setReviews((prev) =>
+      prev.map((r) =>
+        r.review_id === reviewId
+          ? { ...r, rating, review: reviewText, updated_at: new Date().toISOString() }
+          : r
+      )
+    )
+    updateReviewInBackend(reviewId, { rating, review: reviewText })
+  }
+
+  function handleDeleteReview(reviewId) {
+    setReviews((prev) => prev.filter((r) => r.review_id !== reviewId))
+    deleteReviewInBackend(reviewId)
   }
 
   // ============================================
@@ -576,6 +841,62 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     };
   }
 
+  function handleUserSettingChange(key, value) {
+    const userId = auth?.user?.id || 'guest';
+    setUserSettings((prev) => updateSetting(userId, key, value, prev));
+  }
+
+  function handleQuickThemeToggle(nextTheme) {
+    handleUserSettingChange('theme', nextTheme);
+  }
+
+  function handleDownloadReadingData() {
+    if (!auth?.user?.id) return;
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      username: auth?.user?.username || auth?.user?.email || '',
+      settings: userSettings,
+      currentlyReading,
+      educationalBooks,
+      previousReads,
+      reviews,
+      reviewInsights,
+      userPreferenceModel,
+      personalityProfile,
+      annualWrapped,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `smartshelf-reading-data-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    document.body.removeChild(anchor);
+    window.URL.revokeObjectURL(url);
+  }
+
+  function handleResetRecommendationModel() {
+    const resetAt = new Date().toISOString();
+    setUserFeedback(DEFAULT_USER_FEEDBACK);
+    setUserPreferenceModel({});
+    setReviewInsights(DEFAULT_REVIEW_INSIGHTS);
+    setRecommendations([]);
+    handleUserSettingChange('lastRecommendationResetAt', resetAt);
+  }
+
+  function handleClearReadingHistory() {
+    setPreviousReads([]);
+    setReviews([]);
+    setAnnualWrapped(null);
+    setPersonalityProfile(null);
+    setUserFeedback(DEFAULT_USER_FEEDBACK);
+    setUserPreferenceModel({});
+    setReviewInsights(DEFAULT_REVIEW_INSIGHTS);
+    setRecommendations([]);
+    setEducationalBooks((prev) => prev.filter((book) => book.eduStatus !== 'completed'));
+  }
+
   // ============================================
   // END ANALYTICS FUNCTIONS
   // ============================================
@@ -594,6 +915,10 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   function calculateFeedbackScore(book) {
     let score = 0;
     const { likedGenres, dislikedGenres, likedTags, dislikedTags } = userFeedback;
+    const normalizedGenre = String(book.genre || '').toLowerCase();
+    const preferredGenres = (userSettings.preferredGenres || []).map((genre) => genre.toLowerCase());
+    const avoidedGenres = (userSettings.avoidedGenres || []).map((genre) => genre.toLowerCase());
+    const recommendationStyle = userSettings.recommendationStyle || 'balanced';
 
     // Check genre
     if (book.genre) {
@@ -601,6 +926,18 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       const dislikedCount = dislikedGenres.get(book.genre) || 0;
       score += likedCount * 0.3; // Boost for liked genre
       score -= dislikedCount * 0.5; // Penalty for disliked genre
+    }
+
+    if (preferredGenres.includes(normalizedGenre)) {
+      score += recommendationStyle === 'safe' ? 1.15 : recommendationStyle === 'balanced' ? 0.7 : 0.35;
+    } else if (recommendationStyle === 'discovery' && normalizedGenre && !avoidedGenres.includes(normalizedGenre)) {
+      score += 0.3;
+    } else if (recommendationStyle === 'safe' && normalizedGenre) {
+      score -= 0.15;
+    }
+
+    if (avoidedGenres.includes(normalizedGenre)) {
+      score -= 1.5;
     }
 
     // Check tags (emotion_tags or tags array)
@@ -645,6 +982,47 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       .sort((a, b) => b.adjustedScore - a.adjustedScore);
   }
 
+  function applyReviewIntelligence(recommendations) {
+    if (!userSettings.reviewIntelligence) {
+      return recommendations.map((book) => ({
+        ...book,
+        recommendation_explanation:
+          book.reason || 'Recommended based on your reading shelves and explicit preference controls.',
+      }))
+    }
+
+    const hasReviewSignals = Object.keys(userPreferenceModel?.userPreferenceModel || {}).length > 0
+      || Object.keys(userPreferenceModel?.genrePreferenceScores || {}).length > 0
+
+    const driftMultiplier = {
+      slow: 0.7,
+      moderate: 1,
+      aggressive: 1.35,
+    }[userSettings.tasteDriftSensitivity || 'moderate']
+
+    if (!hasReviewSignals) {
+      return recommendations.map((book) => ({
+        ...book,
+        recommendation_explanation:
+          book.reason || 'Recommended based on your reading shelves and genre preferences.',
+      }))
+    }
+
+    return recommendations
+      .map((book) => {
+        const signal = scoreRecommendationSignals(book, userPreferenceModel)
+        const baseScore = Number(book.adjustedScore ?? book.matchScore ?? book.score ?? 0)
+        const finalScore = baseScore + (signal.weightedScore * driftMultiplier)
+        return {
+          ...book,
+          reviewSignalScore: signal.weightedScore * driftMultiplier,
+          adjustedScore: finalScore,
+          recommendation_explanation: generateRecommendationExplanation(book, userPreferenceModel),
+        }
+      })
+      .sort((a, b) => b.adjustedScore - a.adjustedScore)
+  }
+
   async function handlePromptSubmit(prompt) {
     setLoading(true);
     setError('');
@@ -673,8 +1051,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       // Apply feedback filtering to recommendations
       const rawRecommendations = data.recommendations || [];
       const filteredRecommendations = applyFeedbackFiltering(rawRecommendations);
-      
-      setRecommendations(filteredRecommendations);
+
+      const reviewAwareRecommendations = applyReviewIntelligence(filteredRecommendations)
+      setRecommendations(reviewAwareRecommendations);
     } catch (e) {
         console.error('Error details:', e);
       setError(e.message);
@@ -712,21 +1091,30 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
   if (!auth) {
     return (
-      <div className="w-full h-screen overflow-hidden">
-        <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
-      </div>
+      <>
+        <ThemeToggle theme={theme} setTheme={handleQuickThemeToggle} />
+        <CursorParticleCanvas theme={theme} />
+        <SpaceBackground active={theme === 'dark'} />
+        <div className="w-full h-screen overflow-hidden">
+          <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
+        </div>
+      </>
     );
   }
 
   return (
+    <>
+      <ThemeToggle theme={theme} setTheme={handleQuickThemeToggle} />
+      <CursorParticleCanvas theme={theme} />
+      <SpaceBackground active={theme === 'dark'} />
     <div 
-      className={`app-layout w-full h-screen overflow-hidden font-sans transition-all duration-200 ${theme === 'dark' ? 'bg-black text-white' : 'text-slate-800'} ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`} 
-      style={{ backgroundColor: theme === 'dark' ? '#000000' : '#FAF7F2' }}
+      className={`app-layout w-full h-screen overflow-hidden font-sans transition-all duration-300 ${theme === 'dark' ? 'text-white' : 'text-slate-800'} ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`}
     >
       {auth && (
         <HamburgerMenu 
           isOpen={menuOpen} 
           setIsOpen={setMenuOpen} 
+          theme={theme}
           activeSection={activeSection} 
           setActiveSection={setActiveSection}
         />
@@ -786,6 +1174,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               onUpdateStatus={handleUpdateBookStatus}
               onLike={handleLikeBook}
               onDislike={handleDislikeBook}
+              onSubmitReview={handleSubmitFinishedReview}
               userId={auth?.user?.id}
             />
           </section>
@@ -833,9 +1222,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
                     index={idx}
                     statusBadge={
                       <span className={`text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm ${
-                        book.liked ? 'bg-green-600' : 'bg-red-500'
+                        book.liked === true ? 'bg-green-600' : book.liked === false ? 'bg-red-500' : 'bg-slate-500'
                       }`}>
-                        {book.liked ? '👍 Liked' : '👎 Disliked'}
+                        {book.liked === true ? '👍 Liked' : book.liked === false ? '👎 Disliked' : '⭐ Rated'}
                       </span>
                     }
                   >
@@ -886,8 +1275,19 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               annualWrapped={annualWrapped}
               previousReads={previousReads}
               educationalBooks={educationalBooks}
+              reviewInsights={reviewInsights}
             />
           </section>
+        )}
+
+        {/* Author Dashboard Section */}
+        {auth && activeSection === 'author_dashboard' && (
+          <AuthorDashboard
+            previousReads={previousReads}
+            currentlyReading={currentlyReading}
+            educationalBooks={educationalBooks}
+            wantToRead={recommendations}
+          />
         )}
 
         {/* Settings Section */}
@@ -896,16 +1296,25 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary dark:text-primary">⚙️ Settings</h2>
             <Settings 
               theme={theme}
-              setTheme={setTheme}
+              userSettings={userSettings}
+              onUpdateSetting={handleUserSettingChange}
               onLogout={handleLogout}
               onDeleteAccount={handleDeleteAccount}
+              onDownloadReadingData={handleDownloadReadingData}
+              onResetRecommendationModel={handleResetRecommendationModel}
+              onClearReadingHistory={handleClearReadingHistory}
               userEmail={auth?.user?.email}
               username={auth?.user?.username}
+              reviews={reviews}
+              previousReads={previousReads}
+              onUpdateReview={handleUpdateReview}
+              onDeleteReview={handleDeleteReview}
             />
           </section>
         )}
         </div>
       </main>
     </div>
+    </>
   );
 }

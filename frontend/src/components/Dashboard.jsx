@@ -132,10 +132,42 @@ function donutSlice(cx, cy, oR, iR, s, e) {
   return `M ${os.x} ${os.y} A ${oR} ${oR} 0 ${lg} 1 ${oe.x} ${oe.y} L ${ie.x} ${ie.y} A ${iR} ${iR} 0 ${lg} 0 ${is_.x} ${is_.y} Z`
 }
 
+function titleCase(v) {
+  return String(v || '')
+    .replace(/[-_]/g, ' ')
+    .split(' ')
+    .filter(Boolean)
+    .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+    .join(' ')
+}
+
+function moodToneLabel(mood, genre) {
+  const g = String(genre || '').toLowerCase()
+  if (mood === 'Dark' && g.includes('romance')) return 'Dark Romance Phase'
+  if (['psychology', 'philosophy', 'sociology', 'education', 'history', 'science'].some(k => g.includes(k))) return 'Intellectual Exploration'
+  if (mood === 'Intense' || g.includes('fiction') || g.includes('literary')) return 'Emotional Fiction Return'
+  if (g.includes('romance')) return 'Romance Reinforcement'
+  if (mood) return `${mood} Reading Phase`
+  if (genre) return `${titleCase(genre)} Phase`
+  return 'Discovery Phase'
+}
+
+function normalizeRating(book) {
+  const val = Number(book?.rating)
+  if (Number.isFinite(val) && val >= 1 && val <= 5) return val
+  if (book?.liked === true) return 4.4
+  if (book?.liked === false) return 2.6
+  return 3.6
+}
+
+function clampPercent(value) {
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
 /* ══════════════════════════════════════════════════════════════
  *  MAIN COMPONENT
  * ══════════════════════════════════════════════════════════════ */
-export default function Dashboard({ personalityProfile, annualWrapped, previousReads = [], educationalBooks = [] }) {
+export default function Dashboard({ personalityProfile, annualWrapped, previousReads = [], educationalBooks = [], reviewInsights = {} }) {
 
   // ── All year books (merged) ──
   const yearBooks = useMemo(() => {
@@ -277,6 +309,210 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
   // ── Consistency interpretation ──
   const consistencyLabel = consistency >= 80 ? 'You maintained excellent reading discipline.' : consistency >= 60 ? 'You maintained strong reading discipline.' : consistency >= 40 ? 'You had moderate reading regularity.' : 'You read in concentrated bursts.'
 
+  // ── Reader evolution timeline by quarter ──
+  const evolutionTimeline = useMemo(() => {
+    const quarters = [
+      { id: 'Q1', label: 'Jan-Mar', months: [0, 1, 2] },
+      { id: 'Q2', label: 'Apr-Jun', months: [3, 4, 5] },
+      { id: 'Q3', label: 'Jul-Sep', months: [6, 7, 8] },
+      { id: 'Q4', label: 'Oct-Dec', months: [9, 10, 11] },
+    ]
+
+    return quarters.map((q) => {
+      const quarterBooks = yearBooks.filter((b) => {
+        if (!b.finishedAt) return false
+        const m = new Date(b.finishedAt).getMonth()
+        return q.months.includes(m)
+      })
+
+      const genreCount = {}
+      const moodCount = {}
+      quarterBooks.forEach((b) => {
+        const g = (b.genre || 'mixed').toLowerCase()
+        genreCount[g] = (genreCount[g] || 0) + 1
+        const moods = getMoods(b.emotion_tags || b.tags || [])
+        Object.entries(moods).forEach(([mood, c]) => {
+          moodCount[mood] = (moodCount[mood] || 0) + c
+        })
+      })
+
+      const dominantGenre = Object.entries(genreCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'mixed'
+      const dominantMood = Object.entries(moodCount).sort((a, b) => b[1] - a[1])[0]?.[0] || 'Exploratory'
+
+      return {
+        ...q,
+        totalBooks: quarterBooks.length,
+        dominantGenre,
+        dominantMood,
+        phaseLabel: moodToneLabel(dominantMood, dominantGenre),
+      }
+    })
+  }, [yearBooks])
+
+  // ── Reading DNA metrics ──
+  const readingDNA = useMemo(() => {
+    const gd = annualWrapped?.genreDistribution || {}
+    const tags = yearBooks.flatMap((b) => (b.emotion_tags || b.tags || []).map((t) => String(t).toLowerCase()))
+    const totalTags = Math.max(tags.length, 1)
+    const fictionShare = annualWrapped?.totalBooksRead > 0
+      ? ((annualWrapped?.typeBreakdown?.fiction || 0) / annualWrapped.totalBooksRead) * 100
+      : 0
+
+    const pctForGenres = (keywords) => Object.entries(gd).reduce((sum, [genre, pct]) => {
+      const gl = String(genre).toLowerCase()
+      return keywords.some((k) => gl.includes(k)) ? sum + Number(pct || 0) : sum
+    }, 0)
+
+    const tagRatio = (keywords) => {
+      const hit = tags.filter((t) => keywords.some((k) => t.includes(k))).length
+      return hit / totalTags
+    }
+
+    const romanceIntensity = clampPercent(pctForGenres(['romance']) + tagRatio(['romance', 'love', 'tender', 'heart']) * 45)
+    const darkPreference = clampPercent(pctForGenres(['thriller', 'horror', 'dark', 'mystery']) + tagRatio(['dark', 'gritty', 'sinister', 'thriller']) * 55)
+    const emotionalDepth = clampPercent((tagRatio(['emotional', 'poignant', 'intense', 'dramatic']) * 70) + (likeRatio * 0.28))
+    const intellectualCuriosity = clampPercent(pctForGenres(['psychology', 'philosophy', 'sociology', 'history', 'science', 'education']) + tagRatio(['philosophical', 'thought-provoking', 'introspective']) * 50)
+    const narrativeImmersion = clampPercent((fictionShare * 0.7) + (likeRatio * 0.3) + tagRatio(['immersive', 'gripping', 'cinematic']) * 20)
+
+    return [
+      { label: 'Romance Intensity', value: romanceIntensity, color: ROSE },
+      { label: 'Dark Theme Preference', value: darkPreference, color: SLATE },
+      { label: 'Emotional Depth', value: emotionalDepth, color: GOLD },
+      { label: 'Intellectual Curiosity', value: intellectualCuriosity, color: CYAN },
+      { label: 'Narrative Immersion', value: narrativeImmersion, color: BLUE },
+    ]
+  }, [annualWrapped, yearBooks, likeRatio])
+
+  // ── Hidden taste (low-frequency, high-rating genre) ──
+  const hiddenTaste = useMemo(() => {
+    if (!yearBooks.length) return null
+    const byGenre = {}
+    yearBooks.forEach((b) => {
+      const g = (b.genre || 'unknown').toLowerCase()
+      const r = normalizeRating(b)
+      if (!byGenre[g]) byGenre[g] = { count: 0, sum: 0 }
+      byGenre[g].count += 1
+      byGenre[g].sum += r
+    })
+
+    const entries = Object.entries(byGenre).map(([genre, v]) => ({
+      genre,
+      count: v.count,
+      avg: v.sum / v.count,
+    }))
+    const globalAvg = entries.reduce((s, e) => s + (e.avg * e.count), 0) / Math.max(entries.reduce((s, e) => s + e.count, 0), 1)
+    const topCount = Math.max(...entries.map(e => e.count), 1)
+
+    const candidates = entries
+      .filter((e) => e.count < topCount && e.count <= Math.max(2, Math.ceil(topCount * 0.6)) && e.avg >= globalAvg + 0.35)
+      .sort((a, b) => ((b.avg - globalAvg) / b.count) - ((a.avg - globalAvg) / a.count))
+
+    if (!candidates.length) return null
+    const winner = candidates[0]
+    return {
+      ...winner,
+      message: `You rate ${titleCase(winner.genre)} books unusually high compared to how often you read them.`
+    }
+  }, [yearBooks])
+
+  // ── Recommendation confidence score ──
+  const recommendationConfidence = useMemo(() => {
+    const sortedGenres = Object.entries(annualWrapped?.genreDistribution || {}).sort((a, b) => b[1] - a[1])
+    const topGenre = sortedGenres[0]?.[0] || 'mixed'
+    const rawTop = Number(sortedGenres[0]?.[1] || 0)
+    const dominance = rawTop > 1 ? rawTop / 100 : rawTop
+    const score = clampPercent(dominance * likeRatio)
+    let summary = 'Our AI is still learning your preferences from mixed signals.'
+    if (score >= 85) summary = 'Our AI understands your reading taste with high certainty.'
+    else if (score >= 65) summary = 'Our AI has a strong signal of your preferences with room to refine.'
+    else if (score >= 45) summary = 'Our AI sees evolving patterns and is adapting recommendations dynamically.'
+    return { score, topGenre, summary }
+  }, [annualWrapped, likeRatio])
+
+  // ── Reading universe clusters ──
+  const universeClusters = useMemo(() => {
+    const clusterRules = {
+      'Romance Cluster': ['romance', 'love', 'contemporary romance'],
+      'Dark Fiction Cluster': ['thriller', 'horror', 'mystery', 'dark', 'crime', 'gothic'],
+      'Academic Cluster': ['education', 'science', 'history', 'economics', 'biography'],
+      'Philosophical Cluster': ['psychology', 'philosophy', 'sociology', 'literary'],
+    }
+
+    const totals = {
+      'Romance Cluster': 0,
+      'Dark Fiction Cluster': 0,
+      'Academic Cluster': 0,
+      'Philosophical Cluster': 0,
+    }
+
+    Object.entries(annualWrapped?.genreDistribution || {}).forEach(([genre, pct]) => {
+      const gl = String(genre).toLowerCase()
+      const target = Object.entries(clusterRules).find(([, keys]) => keys.some((k) => gl.includes(k)))?.[0]
+      if (target) totals[target] += Number(pct || 0)
+      else totals['Dark Fiction Cluster'] += Number(pct || 0) * 0.5
+    })
+
+    const sum = Object.values(totals).reduce((s, v) => s + v, 0)
+    if (sum <= 0) return []
+    return Object.entries(totals)
+      .map(([cluster, value], i) => ({
+        cluster,
+        value: (value / sum) * 100,
+        color: PIE_COLORS[i % PIE_COLORS.length],
+      }))
+      .filter((c) => c.value > 1)
+      .sort((a, b) => b.value - a.value)
+  }, [annualWrapped])
+
+  // ── Rarest discovery ──
+  const rarestDiscovery = useMemo(() => {
+    if (!yearBooks.length) return null
+    const genreCount = {}
+    const authorCount = {}
+    yearBooks.forEach((b) => {
+      const g = (b.genre || 'unknown').toLowerCase()
+      const a = (b.author || 'unknown').toLowerCase()
+      genreCount[g] = (genreCount[g] || 0) + 1
+      authorCount[a] = (authorCount[a] || 0) + 1
+    })
+
+    const scored = yearBooks.map((b) => {
+      const g = (b.genre || 'unknown').toLowerCase()
+      const a = (b.author || 'unknown').toLowerCase()
+      const genreFreq = genreCount[g] / yearBooks.length
+      const authorFreq = authorCount[a] / yearBooks.length
+      const popularityScore = (genreFreq * 0.7) + (authorFreq * 0.3)
+      return { ...b, popularityScore }
+    })
+
+    return scored.sort((a, b) => a.popularityScore - b.popularityScore)[0]
+  }, [yearBooks])
+
+  // ── AI reflection + forecast ──
+  const aiReflection = useMemo(() => {
+    const topGenres = Object.entries(annualWrapped?.genreDistribution || {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => titleCase(g))
+    const moodTotals = {}
+    yearBooks.forEach((b) => {
+      const moods = getMoods(b.emotion_tags || b.tags || [])
+      Object.entries(moods).forEach(([m, c]) => { moodTotals[m] = (moodTotals[m] || 0) + c })
+    })
+    const topMood = Object.entries(moodTotals).sort((a, b) => b[1] - a[1])[0]?.[0] || 'introspective'
+    const [g1 = 'stories', g2 = 'psychological themes'] = topGenres
+    return `You are drawn to ${topMood.toLowerCase()} narratives where ${g1.toLowerCase()} and ${g2.toLowerCase()} intertwine with emotional precision.`
+  }, [annualWrapped, yearBooks])
+
+  const readingForecast = useMemo(() => {
+    const activeQuarters = evolutionTimeline.filter((q) => q.totalBooks > 0)
+    const genres = activeQuarters.map((q) => q.dominantGenre).filter((g) => g !== 'mixed')
+    if (genres.length >= 2 && genres[genres.length - 1] !== genres[0]) {
+      return `Your taste is gradually shifting toward ${titleCase(genres[genres.length - 1])}. Expect future recommendations to explore this direction.`
+    }
+    if (hiddenTaste) {
+      return `A subtle preference for ${titleCase(hiddenTaste.genre)} is emerging. Expect recommendations to lean into this hidden affinity.`
+    }
+    return `Your preference remains stable around ${titleCase(recommendationConfidence.topGenre)} with nuanced mood-driven variations ahead.`
+  }, [evolutionTimeline, hiddenTaste, recommendationConfidence])
+
   // ── EMPTY STATE ──
   if (!annualWrapped || annualWrapped.totalBooksRead === 0) {
     return (
@@ -304,6 +540,84 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
             <span style={{ color: BLUE }}>◈</span> 🧠 AI Reading Intelligence Summary
           </h3>
           <p className="text-sm sm:text-base text-slate-200 leading-relaxed">{aiSummary}</p>
+        </motion.div>
+      )}
+
+      {/* ════════ REVIEW INTELLIGENCE INSIGHTS ════════ */}
+      {(reviewInsights?.topDetectedThemes?.length > 0 || reviewInsights?.preferredStorytellingStyle?.length > 0) && (
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }}
+          className="p-5 sm:p-7 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 mb-3">
+            <span style={{ color: BLUE }}>◈</span> 📝 Review Intelligence Insights
+          </h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Top detected themes</p>
+              <div className="flex flex-wrap gap-2">
+                {(reviewInsights?.topDetectedThemes || []).slice(0, 6).map((theme) => (
+                  <span
+                    key={theme}
+                    className="px-3 py-1 rounded-full text-xs font-medium"
+                    style={{ background: `${BLUE}24`, border: `1px solid ${BLUE}50`, color: '#dbeafe' }}
+                  >
+                    {theme}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Preferred storytelling style</p>
+              <ul className="space-y-1">
+                {(reviewInsights?.preferredStorytellingStyle || []).slice(0, 4).map((style) => (
+                  <li key={style} className="text-sm text-slate-200">• {style}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="md:col-span-2 rounded-xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Reading profile</p>
+              {(reviewInsights?.readingProfile?.primaryInterest || reviewInsights?.readingProfile?.secondaryInterest || reviewInsights?.readingProfile?.preferredTone) ? (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                  <p className="text-slate-300">
+                    <span className="text-slate-400">Primary Interest:</span>{' '}
+                    <span className="text-white">{reviewInsights?.readingProfile?.primaryInterest || 'Not enough data'}</span>
+                  </p>
+                  <p className="text-slate-300">
+                    <span className="text-slate-400">Secondary Interest:</span>{' '}
+                    <span className="text-white">{reviewInsights?.readingProfile?.secondaryInterest || 'Not enough data'}</span>
+                  </p>
+                  <p className="text-slate-300">
+                    <span className="text-slate-400">Preferred Tone:</span>{' '}
+                    <span className="text-white">{reviewInsights?.readingProfile?.preferredTone || 'Not enough data'}</span>
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-400">Complete more ratings to generate a reading profile.</p>
+              )}
+            </div>
+          </div>
+
+          {Array.isArray(reviewInsights?.reviewWordCloud) && reviewInsights.reviewWordCloud.length > 0 && (
+            <div className="mt-5">
+              <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Review word cloud</p>
+              <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3 flex flex-wrap items-end gap-x-3 gap-y-1">
+                {reviewInsights.reviewWordCloud.slice(0, 24).map((w) => (
+                  <span
+                    key={w.word}
+                    style={{
+                      fontSize: `${w.size || 12}px`,
+                      color: '#e2e8f0',
+                      opacity: Math.max(0.45, Math.min(1, (w.count || 1) / 6)),
+                    }}
+                  >
+                    {w.word}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -645,6 +959,141 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
           </div>
         </motion.div>
       )}
+
+      {/* ════════ READER EVOLUTION TIMELINE ════════ */}
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72 }}
+        className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+        <Heading icon="🧬" title="Reader Evolution Timeline" />
+        <div className="mt-4 overflow-x-auto pb-1">
+          <div className="min-w-[700px] flex items-start gap-3">
+            {evolutionTimeline.map((q, idx) => (
+              <React.Fragment key={q.id}>
+                <div className="min-w-[160px] rounded-xl border border-white/10 bg-white/5 p-3">
+                  <p className="text-[10px] uppercase tracking-wide text-slate-400">{q.label}</p>
+                  <p className="text-sm text-white font-semibold mt-1">{q.phaseLabel}</p>
+                  <p className="text-[11px] text-slate-300 mt-2">Genre: {titleCase(q.dominantGenre)}</p>
+                  <p className="text-[11px] text-slate-400">Mood: {q.dominantMood}</p>
+                  <p className="text-[11px] text-slate-400">Books: {q.totalBooks}</p>
+                </div>
+                {idx < evolutionTimeline.length - 1 && (
+                  <div className="self-center text-slate-500">→</div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ════════ READING DNA + CONFIDENCE ════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75 }}
+          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <Heading icon="🧪" title="Reading DNA Profile" />
+          <div className="mt-4 space-y-3">
+            {readingDNA.map((metric) => (
+              <div key={metric.label}>
+                <div className="flex justify-between items-center text-xs mb-1">
+                  <span className="text-slate-300">{metric.label}</span>
+                  <span className="text-white font-semibold">{metric.value}%</span>
+                </div>
+                <div className="h-2.5 rounded-full bg-slate-800/80 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${metric.value}%` }}
+                    transition={{ duration: 0.8 }}
+                    className="h-full rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${metric.color}80, ${metric.color})` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.78 }}
+          className="p-5 sm:p-6 rounded-2xl flex flex-col justify-center" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <Heading icon="🎯" title="Recommendation Intelligence Score" />
+          <div className="mt-5 text-center">
+            <div className="text-5xl sm:text-6xl font-black text-white" style={{ textShadow: `0 0 24px ${BLUE}` }}>{recommendationConfidence.score}%</div>
+            <p className="text-xs text-slate-400 mt-2">Recommendation Confidence</p>
+            <p className="text-sm text-slate-200 mt-4 max-w-sm mx-auto leading-relaxed">{recommendationConfidence.summary}</p>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ════════ HIDDEN TASTE + UNIVERSE MAP ════════ */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
+          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <Heading icon="🔎" title="Hidden Taste Detection" />
+          {hiddenTaste ? (
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+              <p className="text-xs uppercase tracking-wide text-slate-400">Hidden Taste Detected</p>
+              <p className="text-lg text-white font-semibold mt-1">{titleCase(hiddenTaste.genre)}</p>
+              <p className="text-sm text-slate-300 mt-2 leading-relaxed">{hiddenTaste.message}</p>
+              <p className="text-xs text-slate-400 mt-3">Avg Rating: {hiddenTaste.avg.toFixed(1)} • Reads: {hiddenTaste.count}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-slate-400 mt-4">No strong hidden affinity detected yet. Keep rating across genres to reveal latent tastes.</p>
+          )}
+        </motion.div>
+
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.84 }}
+          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <Heading icon="🌌" title="Reading Universe Map" />
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
+            <div className="h-6 rounded-lg overflow-hidden flex">
+              {universeClusters.map((cluster) => (
+                <div
+                  key={cluster.cluster}
+                  className="h-full"
+                  style={{ width: `${cluster.value}%`, background: cluster.color }}
+                  title={`${cluster.cluster}: ${Math.round(cluster.value)}%`}
+                />
+              ))}
+            </div>
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {universeClusters.map((cluster) => (
+                <div key={cluster.cluster} className="flex items-center gap-2 text-xs text-slate-300">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ background: cluster.color }} />
+                  <span>{cluster.cluster}</span>
+                  <span className="text-slate-400 ml-auto">{Math.round(cluster.value)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* ════════ RAREST DISCOVERY ════════ */}
+      {rarestDiscovery && (
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.88 }}
+          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+          <Heading icon="🗝️" title="Your Rarest Discovery" />
+          <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+            <div>
+              <p className="text-lg text-white font-semibold">{rarestDiscovery.title}</p>
+              <p className="text-sm text-slate-300 mt-1">{rarestDiscovery.author || 'Unknown author'} • {titleCase(rarestDiscovery.genre || 'mixed')}</p>
+              <p className="text-sm text-slate-300 mt-3 leading-relaxed">Only a small fraction of readers explore books like this.</p>
+            </div>
+            <div className="self-end text-right">
+              <p className="text-xs text-slate-500">Popularity score</p>
+              <p className="text-xl font-bold text-white">{(rarestDiscovery.popularityScore * 100).toFixed(1)}</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ════════ FORECAST + REFLECTION ════════ */}
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.92 }}
+        className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+        <Heading icon="🔮" title="Reading Forecast" />
+        <p className="text-sm sm:text-base text-slate-200 leading-relaxed mt-4">{readingForecast}</p>
+        <div className="mt-5 pt-4 border-t border-white/10">
+          <p className="text-xs uppercase tracking-wide text-slate-400">AI Reading Reflection</p>
+          <p className="text-sm sm:text-base text-slate-200 leading-relaxed mt-2">{aiReflection}</p>
+        </div>
+      </motion.div>
     </div>
   )
 }

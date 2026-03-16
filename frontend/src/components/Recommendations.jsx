@@ -21,7 +21,14 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
       {recommendations.map((book, idx) => (
-        <CategoryStyledBookCard key={idx} book={book} index={idx} forceDodgerOutline>
+        <CategoryStyledBookCard
+          key={idx}
+          book={book}
+          index={idx}
+          forceDodgerOutline
+          enableSynopsisToggle
+          synopsisPreviewChars={140}
+        >
           {(() => {
             const rawType = String(book.type || '').trim().toLowerCase()
             const normalizedType = rawType === 'self_help' || rawType === 'self help' ? 'self-help' : rawType
@@ -89,6 +96,13 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
           ) : (
             <ReadingInsightsPanel book={book} />
           )}
+
+          <div className="rounded-md border border-white/15 bg-slate-900/40 px-3 py-2">
+            <p className="text-[11px] font-semibold text-slate-200">Why SmartShelf Recommends This</p>
+            <p className="text-[11px] text-slate-300 mt-1 leading-relaxed">
+              {book.recommendation_explanation || book.reason || 'Recommended based on your reading preferences.'}
+            </p>
+          </div>
               </>
             )
           })()}

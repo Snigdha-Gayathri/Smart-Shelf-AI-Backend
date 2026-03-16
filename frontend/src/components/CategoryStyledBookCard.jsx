@@ -72,9 +72,12 @@ export default function CategoryStyledBookCard({
   statusBadge,
   onClick,
   forceDodgerOutline = false,
+  enableSynopsisToggle = false,
+  synopsisPreviewChars = 140,
 }) {
   const [imgError, setImgError] = useState(false)
   const [hovered, setHovered] = useState(false)
+  const [synopsisExpanded, setSynopsisExpanded] = useState(false)
 
   const rawType = String(book.type || '').trim().toLowerCase()
   const type = rawType === 'self_help' || rawType === 'self help' ? 'self-help' : (rawType || 'fiction')
@@ -114,6 +117,13 @@ export default function CategoryStyledBookCard({
   const dodgerGlow = hovered
     ? '0 0 12px #1E90FF, 0 0 24px rgba(30,144,255,0.9), 0 0 40px rgba(30,144,255,0.7)'
     : '0 0 8px #1E90FF, 0 0 16px rgba(30,144,255,0.7), 0 0 24px rgba(30,144,255,0.5)'
+
+  const synopsisText = String(book.synopsis || '').trim()
+  const shouldTruncateSynopsis = enableSynopsisToggle && synopsisText.length > synopsisPreviewChars
+  const synopsisCollapsedText = shouldTruncateSynopsis
+    ? `${synopsisText.slice(0, synopsisPreviewChars).trimEnd()}...`
+    : synopsisText
+  const synopsisRegionId = `synopsis-${index}-${String(book.title || '').replace(/\s+/g, '-').toLowerCase()}`
 
   return (
     <div
@@ -213,9 +223,43 @@ export default function CategoryStyledBookCard({
 
       {/* Synopsis */}
       {book.synopsis && (
-        <p className="text-xs text-slate-300 mt-3 line-clamp-2 relative z-[2]">
-          {book.synopsis}
-        </p>
+        <div className="mt-3 relative z-[2]">
+          {enableSynopsisToggle ? (
+            <>
+              <div
+                id={synopsisRegionId}
+                style={{
+                  maxHeight: synopsisExpanded ? '220px' : '3.8em',
+                  minHeight: '3.8em',
+                  overflow: 'hidden',
+                  transition: 'max-height 0.35s ease',
+                }}
+              >
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  {synopsisExpanded ? synopsisText : synopsisCollapsedText}
+                </p>
+              </div>
+
+              {shouldTruncateSynopsis && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSynopsisExpanded((s) => !s)
+                  }}
+                  className="mt-1 text-xs font-medium text-blue-300 hover:text-blue-200 transition-colors"
+                  aria-expanded={synopsisExpanded}
+                  aria-controls={synopsisRegionId}
+                  aria-label={synopsisExpanded ? 'Read less description' : 'Read more description'}
+                >
+                  {synopsisExpanded ? 'Read Less' : 'Read More'}
+                </button>
+              )}
+            </>
+          ) : (
+            <p className="text-xs text-slate-300 line-clamp-2">{synopsisText}</p>
+          )}
+        </div>
       )}
 
       {/* Score row — personality match + quantum indicator */}

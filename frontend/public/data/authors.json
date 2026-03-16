@@ -1,0 +1,518 @@
+[
+    {
+        "name":  "L.J. Shen",
+        "website":  "https://www.authorljshen.com"
+    },
+    {
+        "name":  "Maya Hughes",
+        "website":  "https://www.mayahughes.com"
+    },
+    {
+        "name":  "Colleen Hoover",
+        "website":  "https://www.colleenhoover.com"
+    },
+    {
+        "name":  "Monica Murphy",
+        "website":  "https://www.monicamurphyauthor.com"
+    },
+    {
+        "name":  "E.L. James",
+        "website":  "https://www.eljamesauthor.com"
+    },
+    {
+        "name":  "Ali Hazelwood",
+        "website":  "https://alihazelwood.com"
+    },
+    {
+        "name":  "Elena Armas",
+        "website":  "https://authorelenaarmas.com"
+    },
+    {
+        "name":  "Ana Huang",
+        "website":  "https://anahuang.com"
+    },
+    {
+        "name":  "Tahereh Mafi",
+        "website":  "https://www.taherehmafi.com"
+    },
+    {
+        "name":  "Christina Lauren",
+        "website":  "https://christinalaurenbooks.com"
+    },
+    {
+        "name":  "Lauren Asher",
+        "website":  "https://laurenasher.com"
+    },
+    {
+        "name":  "Tessa Bailey",
+        "website":  "https://www.tessabailey.com"
+    },
+    {
+        "name":  "Rina Kent",
+        "website":  "https://www.rinakent.com"
+    },
+    {
+        "name":  "Mia Sheridan",
+        "website":  "https://miasheridan.com"
+    },
+    {
+        "name":  "H.D. Carlton",
+        "website":  "https://hdcarlton.com"
+    },
+    {
+        "name":  "Sadie Kincaid",
+        "website":  "https://sadiekincaid.com"
+    },
+    {
+        "name":  "Elsie Silver",
+        "website":  "https://www.elsiesilver.com"
+    },
+    {
+        "name":  "J.T. Geissinger",
+        "website":  "https://www.jtgeissinger.com"
+    },
+    {
+        "name":  "Kat Singleton",
+        "website":  "https://authorkatsingleton.com"
+    },
+    {
+        "name":  "Catharina Maura",
+        "website":  "https://catharinamaura.com"
+    },
+    {
+        "name":  "Lauren Roberts",
+        "website":  "https://www.laurenrobertslibrary.com"
+    },
+    {
+        "name":  "RuNyx",
+        "website":  "https://runyxwrites.com"
+    },
+    {
+        "name":  "Sophie Lark",
+        "website":  "https://sophielark.com"
+    },
+    {
+        "name":  "Sierra Simone",
+        "website":  "https://www.sierrasimone.net"
+    },
+    {
+        "name":  "Michelle Heard",
+        "website":  "https://michelleheard.com"
+    },
+    {
+        "name":  "Sarah Adams",
+        "website":  "https://www.authorSarahAdams.com"
+    },
+    {
+        "name":  "Meghan Quinn",
+        "website":  "https://www.meghanquinnauthor.com"
+    },
+    {
+        "name":  "Tessa Layne",
+        "website":  "https://www.tessalayne.com"
+    },
+    {
+        "name":  "Blake Crouch",
+        "website":  "https://blakecrouch.com"
+    },
+    {
+        "name":  "Gillian Flynn",
+        "website":  "https://gillianflynn.com"
+    },
+    {
+        "name":  "Madeline Miller",
+        "website":  "https://madelinemiller.com"
+    },
+    {
+        "name":  "Lucy Foley",
+        "website":  "https://lucyfoleybooks.com"
+    },
+    {
+        "name":  "Patrick Rothfuss",
+        "website":  "https://www.patrickrothfuss.com"
+    },
+    {
+        "name":  "Silvia Moreno-Garcia",
+        "website":  "https://www.silviamoreno-garcia.com"
+    },
+    {
+        "name":  "TJ Klune",
+        "website":  "https://tjklune.com"
+    },
+    {
+        "name":  "Lisa Jewell",
+        "website":  "https://lisajewellwriter.com"
+    },
+    {
+        "name":  "Stuart Turton",
+        "website":  "https://stuartturton.com"
+    },
+    {
+        "name":  "R.F. Kuang",
+        "website":  "https://rfkuang.com"
+    },
+    {
+        "name":  "Erin Morgenstern",
+        "website":  "https://www.erinmorgenstern.com"
+    },
+    {
+        "name":  "Stacy Willingham",
+        "website":  "https://stacywillingham.com"
+    },
+    {
+        "name":  "Laura Dave",
+        "website":  "https://lauradave.com"
+    },
+    {
+        "name":  "Taylor Jenkins Reid",
+        "website":  "https://www.taylorjenkinsreid.com"
+    },
+    {
+        "name":  "Riley Sager",
+        "website":  "https://rileysager.com"
+    },
+    {
+        "name":  "Gabrielle Zevin",
+        "website":  "https://gabriellezevin.com"
+    },
+    {
+        "name":  "Alice Feeney",
+        "website":  "https://alicefeeney.com"
+    },
+    {
+        "name":  "Anthony Doerr",
+        "website":  "https://anthonydoerr.com"
+    },
+    {
+        "name":  "Emily St. John Mandel",
+        "website":  "https://emilymandel.com"
+    },
+    {
+        "name":  "Ruth Ware",
+        "website":  "https://www.ruthware.com"
+    },
+    {
+        "name":  "Andy Weir",
+        "website":  "https://andyweirauthor.com"
+    },
+    {
+        "name":  "Grady Hendrix",
+        "website":  "https://gradyhendrix.com"
+    },
+    {
+        "name":  "Barbara Kingsolver",
+        "website":  "https://kingsolver.com"
+    },
+    {
+        "name":  "Adrian McKinty",
+        "website":  "https://adrianmckinty.com"
+    },
+    {
+        "name":  "Jeff VanderMeer",
+        "website":  "https://jeffvandermeer.com"
+    },
+    {
+        "name":  "Ashley Audrain",
+        "website":  "https://ashleyaudrain.com"
+    },
+    {
+        "name":  "Freida McFadden",
+        "website":  "https://freidamcfadden.com"
+    },
+    {
+        "name":  "S.J. Watson",
+        "website":  "https://sjwatsonbooks.com"
+    },
+    {
+        "name":  "Greer Hendricks \u0026 Sarah Pekkanen",
+        "website":  "https://greerhendricksandsarahpekkanen.com"
+    },
+    {
+        "name":  "Sarah Pinborough",
+        "website":  "https://sarahpinborough.com"
+    },
+    {
+        "name":  "Paula Hawkins",
+        "website":  "https://paulahawkinsbooks.com"
+    },
+    {
+        "name":  "B.A. Paris",
+        "website":  "https://baparis.com"
+    },
+    {
+        "name":  "Karin Slaughter",
+        "website":  "https://karinslaughter.com"
+    },
+    {
+        "name":  "Alex Michaelides",
+        "website":  "https://alexmichaelides.com"
+    },
+    {
+        "name":  "Jennifer McMahon",
+        "website":  "https://jennifer-mcmahon.com"
+    },
+    {
+        "name":  "Amitav Ghosh",
+        "website":  "https://amitavghosh.com"
+    },
+    {
+        "name":  "Shashi Tharoor",
+        "website":  "https://shashitharoor.in"
+    },
+    {
+        "name":  "Sanjeev Sanyal",
+        "website":  "https://sanjeev-sanyal.com"
+    },
+    {
+        "name":  "Devdutt Pattanaik",
+        "website":  "https://devdutt.com"
+    },
+    {
+        "name":  "Ashok K. Banker",
+        "website":  "https://ashokbanker.com"
+    },
+    {
+        "name":  "Amish Tripathi",
+        "website":  "https://authoramish.com"
+    },
+    {
+        "name":  "Anand Neelakantan",
+        "website":  "https://anandneelakantan.com"
+    },
+    {
+        "name":  "Chitra Banerjee Divakaruni",
+        "website":  "https://chitradivakaruni.com"
+    },
+    {
+        "name":  "Kavita Kane",
+        "website":  "https://kavitakane.com"
+    },
+    {
+        "name":  "Preeti Shenoy",
+        "website":  "https://preetishenoy.com"
+    },
+    {
+        "name":  "Ravinder Singh",
+        "website":  "https://ravindersingh.in"
+    },
+    {
+        "name":  "Durjoy Datta",
+        "website":  "https://durjoydatta.com"
+    },
+    {
+        "name":  "Sudeep Nagarkar",
+        "website":  "https://sudeepnagarkar.com"
+    },
+    {
+        "name":  "Chetan Bhagat",
+        "website":  "https://chetanbhagat.com"
+    },
+    {
+        "name":  "Ravi Subramanian",
+        "website":  "https://ravisubramanian.in"
+    },
+    {
+        "name":  "Novoneel Chakraborty",
+        "website":  "https://www.novoneelchakraborty.com"
+    },
+    {
+        "name":  "Samit Basu",
+        "website":  "https://samitbasu.com"
+    },
+    {
+        "name":  "Ashwin Sanghi",
+        "website":  "https://ashwinsanghi.com"
+    },
+    {
+        "name":  "Indu Sundaresan",
+        "website":  "https://indusundaresan.com"
+    },
+    {
+        "name":  "Vineet Bajpai",
+        "website":  "https://vineetbajpai.com"
+    },
+    {
+        "name":  "Paramahansa Yogananda",
+        "website":  "https://yogananda.org"
+    },
+    {
+        "name":  "Robin Sharma",
+        "website":  "https://robinsharma.com"
+    },
+    {
+        "name":  "Sadhguru",
+        "website":  "https://www.sadhguru.org"
+    },
+    {
+        "name":  "Yuval Noah Harari",
+        "website":  "https://www.ynharari.com"
+    },
+    {
+        "name":  "Tara Westover",
+        "website":  "https://tarawestover.com"
+    },
+    {
+        "name":  "James Clear",
+        "website":  "https://jamesclear.com"
+    },
+    {
+        "name":  "Rebecca Skloot",
+        "website":  "https://rebeccaskloot.com"
+    },
+    {
+        "name":  "Bessel van der Kolk",
+        "website":  "https://www.besselvanderkolk.com"
+    },
+    {
+        "name":  "Susan Cain",
+        "website":  "https://susancain.net"
+    },
+    {
+        "name":  "Michelle Obama",
+        "website":  "https://michelleobama.com"
+    },
+    {
+        "name":  "Erik Larson",
+        "website":  "https://erik-larson.com"
+    },
+    {
+        "name":  "Malcolm Gladwell",
+        "website":  "https://www.gladwellbooks.com"
+    },
+    {
+        "name":  "Jeannette Walls",
+        "website":  "https://www.jeanettewalls.com"
+    },
+    {
+        "name":  "Charles Duhigg",
+        "website":  "https://charlesduhigg.com"
+    },
+    {
+        "name":  "Trevor Noah",
+        "website":  "https://www.trevornoah.com"
+    },
+    {
+        "name":  "Margot Lee Shetterly",
+        "website":  "https://margotleeshetterly.com"
+    },
+    {
+        "name":  "Matthew Walker",
+        "website":  "https://www.sleepdiplomat.com"
+    },
+    {
+        "name":  "Angela Duckworth",
+        "website":  "https://angeladuckworth.com"
+    },
+    {
+        "name":  "Brené Brown",
+        "website":  "https://brenebrown.com"
+    },
+    {
+        "name":  "Dan Harris",
+        "website":  "https://danharris.com"
+    },
+    {
+        "name":  "Cheryl Strayed",
+        "website":  "https://cherylstrayed.com"
+    },
+    {
+        "name":  "Cal Newport",
+        "website":  "https://calnewport.com"
+    },
+    {
+        "name":  "Jon Ronson",
+        "website":  "https://www.jonronson.com"
+    },
+    {
+        "name":  "Bryan Stevenson",
+        "website":  "https://eji.org"
+    },
+    {
+        "name":  "Michael Pollan",
+        "website":  "https://michaelpollan.com"
+    },
+    {
+        "name":  "Steven D. Levitt",
+        "website":  "https://freakonomics.com"
+    },
+    {
+        "name":  "David Epstein",
+        "website":  "https://davidepstein.com"
+    },
+    {
+        "name":  "Mark Manson",
+        "website":  "https://markmanson.net"
+    },
+    {
+        "name":  "James Nestor",
+        "website":  "https://www.mrjamesnestor.com"
+    },
+    {
+        "name":  "Barbara Oakley",
+        "website":  "https://barbaraoakley.com"
+    },
+    {
+        "name":  "Scott H. Young",
+        "website":  "https://www.scotthyoung.com"
+    },
+    {
+        "name":  "Richard Dawkins",
+        "website":  "https://richarddawkins.net"
+    },
+    {
+        "name":  "Robert T. Kiyosaki",
+        "website":  "https://www.richdad.com"
+    },
+    {
+        "name":  "Neil deGrasse Tyson",
+        "website":  "https://www.haydenplanetarium.org/tyson"
+    },
+    {
+        "name":  "Doris Kearns Goodwin",
+        "website":  "https://www.doriskearnsgoodwin.com"
+    },
+    {
+        "name":  "Daniel T. Willingham",
+        "website":  "https://www.danielwillingham.com"
+    },
+    {
+        "name":  "Robert Greene",
+        "website":  "https://powerseductionandwar.com"
+    },
+    {
+        "name":  "Ha-Joon Chang",
+        "website":  "https://hajoonchang.net"
+    },
+    {
+        "name":  "Brandon Sanderson",
+        "website":  "https://www.brandonsanderson.com"
+    },
+    {
+        "name":  "Jen Sincero",
+        "website":  "https://jensincero.com"
+    },
+    {
+        "name":  "Ryan Holiday",
+        "website":  "https://ryanholiday.net"
+    },
+    {
+        "name":  "Gary Chapman",
+        "website":  "https://www.5lovelanguages.com"
+    },
+    {
+        "name":  "Elizabeth Gilbert",
+        "website":  "https://www.elizabethgilbert.com"
+    },
+    {
+        "name":  "David D. Burns",
+        "website":  "https://feelinggood.com"
+    },
+    {
+        "name":  "Morgan Housel",
+        "website":  "https://collabfund.com/blog/author/morgan"
+    },
+    {
+        "name":  "Walter Isaacson",
+        "website":  "https://www.simonandschuster.com/authors/Walter-Isaacson"
+    }
+]
