@@ -41,15 +41,15 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
   /* Sparkle Particle Generator */
   const [sparkles, setSparkles] = useState([])
   useEffect(() => {
-    const chars = ['✦', '✧', '·', '⋆']
-    const generated = Array.from({ length: 30 }).map((_, i) => ({
+    const chars = ['✦', '✧', '·', '⋆', '·', '✧']
+    const generated = Array.from({ length: 45 }).map((_, i) => ({
       id: i,
       char: chars[Math.floor(Math.random() * chars.length)],
       top: `${Math.random() * 100}%`,
       left: `${Math.random() * 100}%`,
-      animationDelay: `${Math.random() * 4}s`,
-      fontSize: `${Math.floor(Math.random() * 5) + 8}px`,
-      opacity: Math.random() * 0.6 + 0.3
+      animationDelay: `${Math.random() * 5}s`,
+      fontSize: `${Math.floor(Math.random() * 6) + 6}px`,
+      opacity: Math.random() * 0.7 + 0.2
     }))
     setSparkles(generated)
   }, [])
@@ -192,8 +192,12 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         <div className="auth-glow-line" />
 
         <div className="auth-mascot-card">
-          <img src={qLexiIntroImage} alt="Q Lexi" className="auth-mascot-img" />
-          <h2 className="auth-mascot-name">Q Lexi</h2>
+          <div className="auth-mascot-content">
+            <img src={qLexiIntroImage} alt="Q Lexi" className="auth-mascot-img" />
+          </div>
+          <div className="auth-mascot-shelf">
+            <h2 className="auth-mascot-name">Q Lexi</h2>
+          </div>
         </div>
       </motion.div>
 
