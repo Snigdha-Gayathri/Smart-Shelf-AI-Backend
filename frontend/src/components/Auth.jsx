@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { FiEye, FiEyeOff, FiUserPlus, FiCheckCircle, FiXCircle } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiUserPlus } from 'react-icons/fi'
 import GoogleAuthButtons from './GoogleAuthButtons'
 import qLexiIntroImage from '../assets/qlexi-intro-removebg-preview-removebg-preview.png'
 import { getApiBase } from '../utils/apiBase'
@@ -18,23 +18,6 @@ const PASSWORD_RULES = [
 
 function allPasswordRulesPass(pw) {
   return PASSWORD_RULES.every((r) => r.test(pw))
-}
-
-function PasswordRulesIndicator({ password }) {
-  if (!password) return null
-  return (
-    <div className="auth-pw-rules">
-      {PASSWORD_RULES.map((rule) => {
-        const pass = rule.test(password)
-        return (
-          <div key={rule.id} className={`auth-pw-rule ${pass ? 'pass' : 'fail'}`}>
-            {pass ? <FiCheckCircle size={12} /> : <FiXCircle size={12} />}
-            <span>{rule.label}</span>
-          </div>
-        )
-      })}
-    </div>
-  )
 }
 
 export default function Auth({ onSuccess, googleAuthEnabled = false }) {
@@ -99,6 +82,19 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
   const [regError, setRegError] = useState('')
   const [regSuccess, setRegSuccess] = useState('')
 
+  /* Forgot password state */
+  const [showForgotModal, setShowForgotModal] = useState(false)
+  const [forgotStep, setForgotStep] = useState('otp')
+  const [forgotUsername, setForgotUsername] = useState('')
+  const [forgotOtpInput, setForgotOtpInput] = useState('')
+  const [forgotOtpToken, setForgotOtpToken] = useState('')
+  const [forgotCurrentPass, setForgotCurrentPass] = useState('')
+  const [forgotNewPass, setForgotNewPass] = useState('')
+  const [forgotConfirmPass, setForgotConfirmPass] = useState('')
+  const [forgotError, setForgotError] = useState('')
+  const [forgotInfo, setForgotInfo] = useState('')
+  const [forgotDemoOtp, setForgotDemoOtp] = useState('')
+
   /* Login handler */
   async function handleLogin(e) {
     e.preventDefault()
@@ -145,7 +141,15 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
     if (!regName.trim()) { setRegError('Name is required.'); return }
     if (!regUsername.trim()) { setRegError('Username is required.'); return }
     if (!allPasswordRulesPass(regPassword)) {
-      setRegError('Password does not meet all requirements.')
+      const failed = PASSWORD_RULES.find((r) => !r.test(regPassword))
+      const msgs = {
+        length: 'Password must be at least 8 characters long.',
+        upper: 'Password must contain at least one uppercase letter.',
+        lower: 'Password must contain at least one lowercase letter.',
+        digit: 'Password must contain at least one number.',
+        special: 'Password must contain at least one special character.',
+      }
+      setRegError(failed ? (msgs[failed.id] || failed.label) : 'Password does not meet all requirements.')
       return
     }
 
@@ -185,6 +189,101 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
       setRegError(err?.message || 'Registration failed')
     } finally {
       setRegLoading(false)
+    }
+  }
+
+  function resetForgotFlow() {
+    setForgotStep('otp')
+    setForgotOtpInput('')
+    setForgotOtpToken('')
+    setForgotCurrentPass('')
+    setForgotNewPass('')
+    setForgotConfirmPass('')
+    setForgotError('')
+    setForgotInfo('')
+    setForgotDemoOtp('')
+  }
+
+  function openForgotModal() {
+    resetForgotFlow()
+    setForgotUsername(loginUsername.trim().toLowerCase())
+    setShowForgotModal(true)
+  }
+
+  function isForgotPasswordStrong(pw) {
+    return pw.length >= 8 && pw.length <= 16 && /[A-Za-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)
+  }
+
+  async function forgotRequestOtp() {
+    setForgotError('')
+    setForgotInfo('')
+    setForgotDemoOtp('')
+    if (!forgotUsername.trim()) { setForgotError('Username is required.'); return }
+    try {
+      const res = await fetch(`${API_BASE}/auth/request-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: forgotUsername.trim().toLowerCase() })
+      })
+      const data = await res.json()
+      if (data.status === 'ok') {
+        setForgotDemoOtp(data.otp || '')
+        setForgotInfo(data.otp ? `Demo OTP: ${data.otp}` : (data.message || 'OTP sent.'))
+      } else {
+        setForgotError(data.error || 'Failed to request OTP.')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
+    }
+  }
+
+  async function forgotVerifyOtp() {
+    setForgotError('')
+    setForgotInfo('')
+    if (!forgotOtpInput.trim()) { setForgotError('OTP is required.'); return }
+    try {
+      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: forgotUsername.trim().toLowerCase(), otp: forgotOtpInput.trim() })
+      })
+      const data = await res.json()
+      if (data.status === 'ok' && data.token) {
+        setForgotOtpToken(data.token)
+        setForgotStep('password')
+        setForgotInfo('OTP verified. Set your new password.')
+      } else {
+        setForgotError(data.error || 'Invalid OTP.')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
+    }
+  }
+
+  async function forgotSubmitNewPassword() {
+    setForgotError('')
+    setForgotInfo('')
+    if (!forgotCurrentPass) { setForgotError('Current password is required.'); return }
+    if (!isForgotPasswordStrong(forgotNewPass)) {
+      setForgotError('Password must be 8–16 characters with letters, numbers, and a special character.')
+      return
+    }
+    if (forgotNewPass !== forgotConfirmPass) { setForgotError('Passwords do not match.'); return }
+    try {
+      const res = await fetch(`${API_BASE}/auth/change-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: forgotUsername, current_password: forgotCurrentPass, new_password: forgotNewPass, token: forgotOtpToken })
+      })
+      const data = await res.json()
+      if (data.status === 'ok') {
+        setForgotStep('success')
+        setForgotInfo(data.message || 'Password updated successfully.')
+      } else {
+        setForgotError(data.error || 'Failed to change password.')
+      }
+    } catch {
+      setForgotError('Network error. Please try again.')
     }
   }
 
@@ -238,13 +337,9 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         <h1 className="auth-brand-title">SmartShelf AI</h1>
         <div className="auth-glow-line" />
 
-        <div className="auth-mascot-card">
-          <div className="auth-mascot-content">
-            <img src={qLexiIntroImage} alt="Q Lexi" className="auth-mascot-img" />
-          </div>
-          <div className="auth-mascot-shelf">
-            <h2 className="auth-mascot-name">Q Lexi</h2>
-          </div>
+        <div className="auth-mascot-floating" aria-label="Q Lexi mascot">
+          <img src={qLexiIntroImage} alt="Q Lexi" className="auth-mascot-img" />
+          <h2 className="auth-mascot-name">Q Lexi</h2>
         </div>
       </motion.div>
 
@@ -255,59 +350,69 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         transition={{ duration: 0.6, delay: 0.1 }}
       >
         <div className="auth-card auth-card-login">
-          <h2 className="auth-card-title">Login</h2>
-          <p className="auth-card-subtitle">Step into your book world</p>
+          <div className="auth-card-header">
+            <h2 className="auth-card-title">Login</h2>
+            <p className="auth-card-subtitle">Step into your book world</p>
+          </div>
 
-          <form onSubmit={handleLogin} className="auth-form auth-login-form">
-            <div className="auth-input-wrapper">
-              <input
-                type="text"
-                placeholder="Username"
-                value={loginUsername}
-                onChange={(e) => { setLoginUsername(e.target.value); setLoginError('') }}
-                className="auth-input-new"
-                autoComplete="username"
-                required
-              />
-            </div>
-            
-            <div className="auth-input-wrapper">
-              <input
-                type={loginShowPw ? 'text' : 'password'}
-                placeholder="Password"
-                value={loginPassword}
-                onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }}
-                className="auth-input-new"
-                autoComplete="current-password"
-                required
-              />
-              <button
-                type="button"
-                className="auth-input-icon-right"
-                onClick={() => setLoginShowPw(!loginShowPw)}
-                aria-label={loginShowPw ? 'Hide password' : 'Show password'}
-              >
-                {loginShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+          <form onSubmit={handleLogin} className="auth-form">
+            <div className="auth-form-fields">
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={loginUsername}
+                  onChange={(e) => { setLoginUsername(e.target.value); setLoginError('') }}
+                  className="auth-input-new"
+                  autoComplete="username"
+                  required
+                />
+              </div>
+
+              <div className="auth-input-wrapper">
+                <input
+                  type={loginShowPw ? 'text' : 'password'}
+                  placeholder="Password"
+                  value={loginPassword}
+                  onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }}
+                  className="auth-input-new"
+                  autoComplete="current-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-input-icon-right"
+                  onClick={() => setLoginShowPw(!loginShowPw)}
+                  aria-label={loginShowPw ? 'Hide password' : 'Show password'}
+                >
+                  {loginShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              </div>
+
+              <button type="button" className="auth-forgot-link" onClick={openForgotModal}>
+                Forgot password?
               </button>
+
+              <AnimatePresence>
+                {loginSuccess && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <div className="auth-msg-new auth-msg-success">{loginSuccess}</div>
+                  </motion.div>
+                )}
+                {loginError && !loginSuccess && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <div className="auth-msg-new auth-msg-error">{loginError}</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <AnimatePresence>
-              {loginSuccess && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                  <div className="auth-msg-new auth-msg-success">{loginSuccess}</div>
-                </motion.div>
-              )}
-              {loginError && !loginSuccess && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                  <div className="auth-msg-new auth-msg-error">{loginError}</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button type="submit" disabled={loginLoading || !!loginSuccess} className="auth-btn-primary">
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>&#8594;</span> Login
-            </button>
-            <GoogleAuthButtons enabled={googleAuthEnabled} mode="login" className="auth-btn-google" buttonText="Continue with Google" />
+            <div className="auth-form-actions">
+              <button type="submit" disabled={loginLoading || !!loginSuccess} className="auth-btn-primary">
+                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>&#8594;</span> Login
+              </button>
+              <GoogleAuthButtons enabled={googleAuthEnabled} mode="login" className="auth-btn-google" buttonText="Continue with Google" />
+            </div>
           </form>
         </div>
       </motion.div>
@@ -319,79 +424,166 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         transition={{ duration: 0.6, delay: 0.2 }}
       >
         <div className="auth-card auth-card-register">
-          <h2 className="auth-card-title">Register</h2>
-          <p className="auth-card-subtitle">Create your book world</p>
+          <div className="auth-card-header">
+            <h2 className="auth-card-title">Register</h2>
+            <p className="auth-card-subtitle">Create your book world</p>
+          </div>
 
-          <form onSubmit={handleRegister} className="auth-form auth-register-form">
-            <div className="auth-input-wrapper">
-              <input
-                type="text"
-                placeholder="Name"
-                value={regName}
-                onChange={(e) => { setRegName(e.target.value); setRegError('') }}
-                className="auth-input-new"
-                autoComplete="name"
-                required
-              />
+          <form onSubmit={handleRegister} className="auth-form">
+            <div className="auth-form-fields">
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={regName}
+                  onChange={(e) => { setRegName(e.target.value); setRegError('') }}
+                  className="auth-input-new"
+                  autoComplete="name"
+                  required
+                />
+              </div>
+
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  placeholder="Username"
+                  value={regUsername}
+                  onChange={(e) => { setRegUsername(e.target.value); setRegError('') }}
+                  className="auth-input-new"
+                  autoComplete="username"
+                  required
+                />
+              </div>
+
+              <div className="auth-input-wrapper">
+                <input
+                  type={regShowPw ? "text" : "password"}
+                  placeholder="Password"
+                  value={regPassword}
+                  onChange={(e) => { setRegPassword(e.target.value); setRegError('') }}
+                  className="auth-input-new"
+                  autoComplete="new-password"
+                  required
+                />
+                <button
+                  type="button"
+                  className="auth-input-icon-right"
+                  onClick={() => setRegShowPw(!regShowPw)}
+                  aria-label={regShowPw ? 'Hide password' : 'Show password'}
+                >
+                  {regShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+                </button>
+              </div>
+
+              <AnimatePresence>
+                {regSuccess && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <div className="auth-msg-new auth-msg-success">{regSuccess}</div>
+                  </motion.div>
+                )}
+                {regError && !regSuccess && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                    <div className="auth-msg-new auth-msg-error">{regError}</div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            <div className="auth-input-wrapper">
-              <input
-                type="text"
-                placeholder="Username"
-                value={regUsername}
-                onChange={(e) => { setRegUsername(e.target.value); setRegError('') }}
-                className="auth-input-new"
-                autoComplete="username"
-                required
-              />
-            </div>
-
-            <div className="auth-input-wrapper">
-              <input
-                type={regShowPw ? "text" : "password"}
-                placeholder="Password"
-                value={regPassword}
-                onChange={(e) => { setRegPassword(e.target.value); setRegError('') }}
-                className="auth-input-new"
-                autoComplete="new-password"
-                required
-              />
-              <button
-                type="button"
-                className="auth-input-icon-right"
-                onClick={() => setRegShowPw(!regShowPw)}
-                aria-label={regShowPw ? 'Hide password' : 'Show password'}
-              >
-                {regShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+            <div className="auth-form-actions">
+              <button type="submit" disabled={regLoading || !!regSuccess} className="auth-btn-primary">
+                <FiUserPlus size={18} /> &nbsp;Register
               </button>
+              <GoogleAuthButtons enabled={googleAuthEnabled} mode="register" className="auth-btn-google" buttonText="Continue with Google" />
             </div>
-
-            <div className="auth-rules-wrap">
-              <p className="auth-pw-helper">Password verification checks</p>
-              <PasswordRulesIndicator password={regPassword} />
-            </div>
-
-            <AnimatePresence>
-              {regSuccess && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                  <div className="auth-msg-new auth-msg-success">{regSuccess}</div>
-                </motion.div>
-              )}
-              {regError && !regSuccess && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
-                  <div className="auth-msg-new auth-msg-error">{regError}</div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            <button type="submit" disabled={regLoading || !!regSuccess} className="auth-btn-primary">
-              <FiUserPlus size={18} /> &nbsp;Register
-            </button>
-            <GoogleAuthButtons enabled={googleAuthEnabled} mode="register" className="auth-btn-google" buttonText="Continue with Google" />
           </form>
         </div>
       </motion.div>
+      {/* Forgot Password Modal */}
+      {showForgotModal && (
+        <div className="auth-forgot-overlay" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>
+          <motion.div
+            className="auth-forgot-modal"
+            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 0.22 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="auth-card-title" style={{ fontSize: '22px', marginBottom: '16px' }}>Reset Password</h3>
+
+            {forgotStep === 'otp' && (
+              <div className="auth-forgot-step">
+                <label className="auth-forgot-label">Username</label>
+                <div className="auth-input-wrapper">
+                  <input
+                    type="text"
+                    value={forgotUsername}
+                    onChange={(e) => setForgotUsername(e.target.value)}
+                    className="auth-input-new"
+                    placeholder="Your username"
+                  />
+                </div>
+                <label className="auth-forgot-label">One-Time Password (OTP)</label>
+                <div className="auth-input-wrapper">
+                  <input
+                    type="text"
+                    value={forgotOtpInput}
+                    onChange={(e) => setForgotOtpInput(e.target.value)}
+                    className="auth-input-new"
+                    placeholder="Enter OTP"
+                    maxLength={6}
+                  />
+                </div>
+                {forgotDemoOtp && <div className="auth-forgot-otp-hint">Demo OTP: <strong>{forgotDemoOtp}</strong></div>}
+                {forgotInfo && <p className="auth-forgot-info">{forgotInfo}</p>}
+                {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
+                <div className="auth-forgot-actions">
+                  <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
+                  <button type="button" className="auth-forgot-secondary-btn" onClick={forgotRequestOtp}>Generate OTP</button>
+                  <button type="button" className="auth-btn-primary auth-forgot-confirm-btn" onClick={forgotVerifyOtp}>Verify OTP</button>
+                </div>
+              </div>
+            )}
+
+            {forgotStep === 'password' && (
+              <div className="auth-forgot-step">
+                <label className="auth-forgot-label">Current Password</label>
+                <div className="auth-input-wrapper">
+                  <input type="password" value={forgotCurrentPass} onChange={(e) => setForgotCurrentPass(e.target.value)} className="auth-input-new" placeholder="Current password" />
+                </div>
+                <label className="auth-forgot-label">New Password</label>
+                <div className="auth-input-wrapper">
+                  <input type="password" value={forgotNewPass} onChange={(e) => setForgotNewPass(e.target.value)} className="auth-input-new" placeholder="New password (8-16 chars)" />
+                </div>
+                <label className="auth-forgot-label">Confirm New Password</label>
+                <div className="auth-input-wrapper">
+                  <input type="password" value={forgotConfirmPass} onChange={(e) => setForgotConfirmPass(e.target.value)} className="auth-input-new" placeholder="Confirm new password" />
+                </div>
+                {forgotInfo && <p className="auth-forgot-info">{forgotInfo}</p>}
+                {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
+                <div className="auth-forgot-actions">
+                  <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
+                  <button
+                    type="button"
+                    className="auth-btn-primary auth-forgot-confirm-btn"
+                    disabled={!forgotCurrentPass || !forgotNewPass || forgotNewPass !== forgotConfirmPass || !isForgotPasswordStrong(forgotNewPass)}
+                    onClick={forgotSubmitNewPassword}
+                  >
+                    Update Password
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {forgotStep === 'success' && (
+              <div className="auth-forgot-step" style={{ textAlign: 'center' }}>
+                <div className="auth-msg-new auth-msg-success" style={{ fontSize: '14px', padding: '12px' }}>\u2713 Password updated successfully!</div>
+                {forgotInfo && <p className="auth-forgot-info" style={{ marginTop: '8px' }}>{forgotInfo}</p>}
+                <button type="button" className="auth-btn-primary" style={{ marginTop: '16px', padding: '10px' }} onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Close</button>
+              </div>
+            )}
+          </motion.div>
+        </div>
+      )}
     </div>
   )
 }
