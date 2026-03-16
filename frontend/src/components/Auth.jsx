@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { FiEye, FiEyeOff, FiUserPlus, FiLogIn, FiCheckCircle, FiXCircle } from 'react-icons/fi'
 import GoogleAuthButtons from './GoogleAuthButtons'
@@ -37,37 +37,22 @@ function PasswordRulesIndicator({ password }) {
   )
 }
 
-function FloatingInput({ id, type = 'text', value, onChange, label, error, autoComplete, showToggle, showPassword, onToggle }) {
-  return (
-    <div className={`auth-field group ${error ? 'animate-auth-shake' : ''}`}>
-      <input
-        id={id}
-        type={showToggle ? (showPassword ? 'text' : 'password') : type}
-        value={value}
-        onChange={onChange}
-        placeholder=" "
-        autoComplete={autoComplete}
-        className={`peer auth-input ${error ? 'auth-input-error' : ''}`}
-        required
-      />
-      <label htmlFor={id} className="auth-float-label">{label}</label>
-      {showToggle && (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="auth-pw-toggle"
-          aria-label={showPassword ? 'Hide password' : 'Show password'}
-        >
-          {showPassword ? <FiEyeOff size={16} /> : <FiEye size={16} />}
-        </button>
-      )}
-      <span className="auth-field-line" />
-    </div>
-  )
-}
-
 export default function Auth({ onSuccess, googleAuthEnabled = false }) {
-  const [activePanel, setActivePanel] = useState('login') // 'login' | 'register'
+  /* Sparkle Particle Generator */
+  const [sparkles, setSparkles] = useState([])
+  useEffect(() => {
+    const chars = ['✦', '✧', '·', '⋆']
+    const generated = Array.from({ length: 30 }).map((_, i) => ({
+      id: i,
+      char: chars[Math.floor(Math.random() * chars.length)],
+      top: `${Math.random() * 100}%`,
+      left: `${Math.random() * 100}%`,
+      animationDelay: `${Math.random() * 4}s`,
+      fontSize: `${Math.floor(Math.random() * 5) + 8}px`,
+      opacity: Math.random() * 0.6 + 0.3
+    }))
+    setSparkles(generated)
+  }, [])
 
   /* Login state */
   const [loginUsername, setLoginUsername] = useState('')
@@ -85,9 +70,6 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
   const [regLoading, setRegLoading] = useState(false)
   const [regError, setRegError] = useState('')
   const [regSuccess, setRegSuccess] = useState('')
-  const [regNameError, setRegNameError] = useState(false)
-  const [regUsernameError, setRegUsernameError] = useState(false)
-  const [regPasswordShake, setRegPasswordShake] = useState(false)
 
   /* Login handler */
   async function handleLogin(e) {
@@ -131,14 +113,10 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
     e.preventDefault()
     setRegError('')
     setRegSuccess('')
-    setRegNameError(false)
-    setRegUsernameError(false)
 
-    if (!regName.trim()) { setRegNameError(true); setRegError('Name is required.'); return }
-    if (!regUsername.trim()) { setRegUsernameError(true); setRegError('Username is required.'); return }
+    if (!regName.trim()) { setRegError('Name is required.'); return }
+    if (!regUsername.trim()) { setRegError('Username is required.'); return }
     if (!allPasswordRulesPass(regPassword)) {
-      setRegPasswordShake(true)
-      window.setTimeout(() => setRegPasswordShake(false), 420)
       setRegError('Password does not meet all requirements.')
       return
     }
@@ -157,7 +135,6 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
       if (!res.ok || data.status !== 'ok') {
         const message = data.error || data.message || 'Registration failed'
         if (message.includes('already registered') || message.includes('already exists')) {
-          setRegUsernameError(true)
           setRegError('Username already exists. Please choose another.')
         } else {
           setRegError(message)
@@ -165,20 +142,17 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
         return
       }
 
-      setRegSuccess('✓ Account created! Switching to login...')
+      setRegSuccess('✓ Account created! You can now login.')
       setRegLoading(false)
 
-      // Auto-switch to login panel after registration
       window.setTimeout(() => {
         setLoginUsername(regUsername.trim().toLowerCase())
         setLoginPassword('')
-        setActivePanel('login')
-        // Clear register form
         setRegName('')
         setRegUsername('')
         setRegPassword('')
         setRegSuccess('')
-      }, 1200)
+      }, 1500)
     } catch (err) {
       setRegError(err?.message || 'Registration failed')
     } finally {
@@ -187,193 +161,187 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
   }
 
   return (
-    <div className="auth-shell relative h-screen w-full overflow-hidden text-white">
-      <div className={`auth-glow-shift ${activePanel}`} />
-      <div className="auth-aurora auth-aurora-one" />
-      <div className="auth-aurora auth-aurora-two" />
-      <div className="auth-grid-overlay" />
-      <div className="auth-library-layer" aria-hidden="true">
-        <span className="floating-book b1" />
-        <span className="floating-book b2" />
-        <span className="floating-book b3" />
-        <span className="floating-page p1" />
-        <span className="floating-page p2" />
-        <span className="floating-page p3" />
-      </div>
-
-      <div className="auth-viewport relative z-10">
-        <div className="auth-layout">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            className="auth-left-panel"
+    <div className="auth-new-shell">
+      {/* Decorative Sparkles */}
+      <div className="auth-sparkles">
+        {sparkles.map(s => (
+          <span
+            key={s.id}
+            className="auth-sparkle"
+            style={{
+              top: s.top,
+              left: s.left,
+              animationDelay: s.animationDelay,
+              fontSize: s.fontSize,
+              opacity: s.opacity
+            }}
           >
-            <div className="auth-left-inner">
-              <div className="auth-left-copy">
-                <p className="auth-left-kicker">
-                  Futuristic Library
-                  <br />
-                  Intelligent Reading
-                </p>
-                <h1 className="auth-left-title">SmartShelf AI</h1>
-              </div>
-
-              <div className="auth-qlexi-section">
-                <div className="auth-qlexi-wrap">
-                  <img src={qLexiIntroImage} alt="Q Lexi" className="auth-qlexi-image" />
-                </div>
-                <div className="auth-qlexi-label">Q Lexi</div>
-              </div>
-            </div>
-          </motion.div>
-
-          <div className="auth-right-area">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.1, ease: 'easeOut' }}
-              className="auth-panel auth-panel-form auth-glass-box"
-              onMouseDown={() => { if (activePanel !== 'login') setActivePanel('login') }}
-            >
-              <div className="auth-panel-inner">
-                <div className="auth-panel-header">
-                  <h2 className="auth-panel-title">Login</h2>
-                  <p className="auth-panel-subtitle">Step into your book world</p>
-                </div>
-
-                <form onSubmit={handleLogin} className="auth-form" onMouseDown={(e) => e.stopPropagation()}>
-                  <FloatingInput
-                    id="login-username"
-                    value={loginUsername}
-                    onChange={(e) => { setLoginUsername(e.target.value); setLoginError('') }}
-                    label="Username"
-                    autoComplete="username"
-                  />
-                  <FloatingInput
-                    id="login-password"
-                    type="password"
-                    value={loginPassword}
-                    onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }}
-                    label="Password"
-                    autoComplete="current-password"
-                    showToggle
-                    showPassword={loginShowPw}
-                    onToggle={() => setLoginShowPw((p) => !p)}
-                  />
-
-                  <AnimatePresence>
-                    {loginSuccess && (
-                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="auth-msg auth-msg-success" role="status">
-                        {loginSuccess}
-                      </motion.div>
-                    )}
-                    {!loginSuccess && loginError && (
-                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="auth-msg auth-msg-error" role="alert">
-                        {loginError}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <button type="submit" disabled={loginLoading || !!loginSuccess} className="auth-submit-btn">
-                    {loginSuccess ? (
-                      <span className="auth-btn-loading"><span className="auth-spinner" />Loading...</span>
-                    ) : loginLoading ? (
-                      <span className="auth-btn-loading"><span className="auth-spinner" />Logging in...</span>
-                    ) : (
-                      <>
-                        <FiLogIn size={16} />
-                        Login
-                      </>
-                    )}
-                  </button>
-
-                  <div className="auth-divider" />
-                  <GoogleAuthButtons enabled={googleAuthEnabled} mode="login" />
-                </form>
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
-              className="auth-panel auth-panel-form auth-glass-box"
-              onMouseDown={() => { if (activePanel !== 'register') setActivePanel('register') }}
-            >
-              <div className="auth-panel-inner">
-                <div className="auth-panel-header">
-                  <h2 className="auth-panel-title">Register</h2>
-                  <p className="auth-panel-subtitle">Create your book world</p>
-                </div>
-
-                <form onSubmit={handleRegister} className="auth-form" onMouseDown={(e) => e.stopPropagation()}>
-                  <FloatingInput
-                    id="reg-name"
-                    value={regName}
-                    onChange={(e) => { setRegName(e.target.value); setRegNameError(false); setRegError('') }}
-                    label="Name"
-                    error={regNameError}
-                    autoComplete="name"
-                  />
-                  <FloatingInput
-                    id="reg-username"
-                    value={regUsername}
-                    onChange={(e) => { setRegUsername(e.target.value); setRegUsernameError(false); setRegError('') }}
-                    label="Username"
-                    error={regUsernameError}
-                    autoComplete="username"
-                  />
-                  <FloatingInput
-                    id="reg-password"
-                    type="password"
-                    value={regPassword}
-                    onChange={(e) => { setRegPassword(e.target.value); setRegError('') }}
-                    label="Password"
-                    error={regPasswordShake}
-                    autoComplete="new-password"
-                    showToggle
-                    showPassword={regShowPw}
-                    onToggle={() => setRegShowPw((p) => !p)}
-                  />
-
-                  <p className="auth-pw-check-label">Password verification checks</p>
-                  <PasswordRulesIndicator password={regPassword} />
-
-                  <AnimatePresence>
-                    {regSuccess && (
-                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="auth-msg auth-msg-success" role="status">
-                        {regSuccess}
-                      </motion.div>
-                    )}
-                    {!regSuccess && regError && (
-                      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="auth-msg auth-msg-error" role="alert">
-                        {regError}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <button type="submit" disabled={regLoading || !!regSuccess} className="auth-submit-btn">
-                    {regSuccess ? (
-                      <span className="auth-btn-loading"><span className="auth-spinner" />Switching...</span>
-                    ) : regLoading ? (
-                      <span className="auth-btn-loading"><span className="auth-spinner" />Creating account...</span>
-                    ) : (
-                      <>
-                        <FiUserPlus size={16} />
-                        Register
-                      </>
-                    )}
-                  </button>
-
-                  <div className="auth-divider" />
-                  <GoogleAuthButtons enabled={googleAuthEnabled} mode="register" />
-                </form>
-              </div>
-            </motion.div>
-          </div>
-        </div>
+            {s.char}
+          </span>
+        ))}
       </div>
+
+      <motion.div
+        className="auth-col-left"
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6 }}
+      >
+        <p className="auth-brand-kicker">Futuristic Library<br/>Intelligent Reading</p>
+        <h1 className="auth-brand-title">SmartShelf AI</h1>
+        <div className="auth-glow-line" />
+
+        <div className="auth-mascot-card">
+          <img src={qLexiIntroImage} alt="Q Lexi" className="auth-mascot-img" />
+          <h2 className="auth-mascot-name">Q Lexi</h2>
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="auth-col-center"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.1 }}
+      >
+        <div className="auth-card">
+          <h2 className="auth-card-title">Login</h2>
+          <p className="auth-card-subtitle">Step into your book world</p>
+
+          <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="auth-input-prefix-wrapper">
+              <span className="auth-input-prefix">/</span>
+              <input
+                type="text"
+                placeholder="Username"
+                value={loginUsername}
+                onChange={(e) => { setLoginUsername(e.target.value); setLoginError('') }}
+                className="auth-input-new"
+                autoComplete="username"
+                required
+              />
+            </div>
+            
+            <div className="auth-input-wrapper">
+              <input
+                type={loginShowPw ? 'text' : 'password'}
+                placeholder="Password"
+                value={loginPassword}
+                onChange={(e) => { setLoginPassword(e.target.value); setLoginError('') }}
+                className="auth-input-new"
+                autoComplete="current-password"
+                required
+              />
+              <button
+                type="button"
+                className="auth-input-icon-right"
+                onClick={() => setLoginShowPw(!loginShowPw)}
+                aria-label={loginShowPw ? 'Hide password' : 'Show password'}
+              >
+                {loginShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+              </button>
+            </div>
+
+            <AnimatePresence>
+              {loginSuccess && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <div className="auth-msg-new auth-msg-success">{loginSuccess}</div>
+                </motion.div>
+              )}
+              {loginError && !loginSuccess && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <div className="auth-msg-new auth-msg-error">{loginError}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button type="submit" disabled={loginLoading || !!loginSuccess} className="auth-btn-primary">
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>&#8594;</span> Login
+            </button>
+            <GoogleAuthButtons enabled={googleAuthEnabled} mode="login" className="auth-btn-google" buttonText="Continue with Google" />
+          </form>
+        </div>
+      </motion.div>
+
+      <motion.div
+        className="auth-col-right"
+        initial={{ opacity: 0, x: 20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.6, delay: 0.2 }}
+      >
+        <div className="auth-card">
+          <h2 className="auth-card-title">Register</h2>
+          <p className="auth-card-subtitle">Create your book world</p>
+
+          <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div className="auth-input-wrapper">
+              <input
+                type="text"
+                placeholder="Name"
+                value={regName}
+                onChange={(e) => { setRegName(e.target.value); setRegError('') }}
+                className="auth-input-new"
+                autoComplete="name"
+                required
+              />
+            </div>
+
+            <div className="auth-input-wrapper">
+              <input
+                type="text"
+                placeholder="Username"
+                value={regUsername}
+                onChange={(e) => { setRegUsername(e.target.value); setRegError('') }}
+                className="auth-input-new"
+                autoComplete="username"
+                required
+              />
+            </div>
+
+            <div className="auth-input-wrapper">
+              <input
+                type={regShowPw ? "text" : "password"}
+                placeholder="Password"
+                value={regPassword}
+                onChange={(e) => { setRegPassword(e.target.value); setRegError('') }}
+                className="auth-input-new"
+                autoComplete="new-password"
+                required
+              />
+              <button
+                type="button"
+                className="auth-input-icon-right"
+                onClick={() => setRegShowPw(!regShowPw)}
+                aria-label={regShowPw ? 'Hide password' : 'Show password'}
+              >
+                {regShowPw ? <FiEyeOff size={18} /> : <FiEye size={18} />}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <p className="auth-pw-helper">Password verification checks</p>
+              <PasswordRulesIndicator password={regPassword} />
+            </div>
+
+            <AnimatePresence>
+              {regSuccess && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <div className="auth-msg-new auth-msg-success">{regSuccess}</div>
+                </motion.div>
+              )}
+              {regError && !regSuccess && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
+                  <div className="auth-msg-new auth-msg-error">{regError}</div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <button type="submit" disabled={regLoading || !!regSuccess} className="auth-btn-primary">
+              <FiUserPlus size={18} /> &nbsp;Register
+            </button>
+            <GoogleAuthButtons enabled={googleAuthEnabled} mode="register" className="auth-btn-google" buttonText="Continue with Google" />
+          </form>
+        </div>
+      </motion.div>
     </div>
   )
 }
