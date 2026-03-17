@@ -1224,6 +1224,82 @@ html.dark .auth-msg-success {
   border: 1px solid rgba(68, 145, 235, 0.45);
 }
 
+/* Explicit theme mapping for login screen */
+.auth-new-shell[data-theme='dark'] {
+  background:
+    radial-gradient(120% 120% at 16% 10%, rgba(64, 96, 160, 0.18) 0%, rgba(16, 24, 40, 0) 48%),
+    radial-gradient(120% 120% at 86% 8%, rgba(80, 44, 140, 0.22) 0%, rgba(15, 18, 30, 0) 44%),
+    linear-gradient(145deg, #05070f 0%, #0a1220 38%, #101f36 66%, #1a1731 100%);
+}
+
+.auth-new-shell[data-theme='dark'] .auth-cursor-snowflake {
+  color: rgba(194, 222, 255, 0.9);
+  text-shadow: 0 0 10px rgba(168, 206, 255, 0.9);
+}
+
+.auth-new-shell[data-theme='dark'] .auth-brand-kicker { color: rgba(196, 221, 255, 0.94); }
+.auth-new-shell[data-theme='dark'] .auth-glow-line {
+  background: linear-gradient(90deg, transparent, rgba(121, 191, 255, 0.55), rgba(184, 215, 255, 0.9), rgba(152, 138, 255, 0.65), transparent);
+  box-shadow: 0 0 14px 2px rgba(90, 135, 220, 0.35);
+}
+.auth-new-shell[data-theme='dark'] .auth-mascot-name {
+  color: #d8e8ff;
+  text-shadow: 0 0 10px rgba(107, 168, 255, 0.55), 0 0 24px rgba(102, 80, 255, 0.32);
+}
+
+.auth-new-shell[data-theme='dark'] .auth-card {
+  background: linear-gradient(180deg, rgba(10, 19, 36, 0.9) 0%, rgba(11, 26, 49, 0.88) 58%, rgba(18, 37, 68, 0.84) 100%);
+  border: 1.5px solid rgba(141, 181, 255, 0.35);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.48), inset 0 1px 14px rgba(131, 179, 255, 0.14), inset 0 -16px 30px rgba(17, 40, 78, 0.35);
+}
+.auth-new-shell[data-theme='dark'] .auth-card-title { color: #9fc6ff; }
+.auth-new-shell[data-theme='dark'] .auth-card-subtitle { color: #9eb6d9; }
+.auth-new-shell[data-theme='dark'] .auth-form-actions { border-top: 1px solid rgba(104, 141, 209, 0.32); }
+
+.auth-new-shell[data-theme='dark'] .auth-input-new {
+  background: rgba(11, 24, 46, 0.9);
+  border: 1px solid rgba(102, 140, 201, 0.52);
+  color: #d7e7ff;
+}
+.auth-new-shell[data-theme='dark'] .auth-input-new::placeholder { color: #87a5cf; }
+.auth-new-shell[data-theme='dark'] .auth-input-new:focus {
+  border-color: #6ea9f4;
+  box-shadow: 0 0 0 3px rgba(73, 128, 207, 0.34);
+}
+.auth-new-shell[data-theme='dark'] .auth-input-icon-right { color: #a5bddf; }
+
+.auth-new-shell[data-theme='dark'] .auth-btn-google {
+  background: rgba(13, 28, 52, 0.88);
+  border: 1.5px solid rgba(111, 149, 212, 0.5);
+  color: #c4d9f7;
+}
+.auth-new-shell[data-theme='dark'] .auth-btn-google:hover {
+  background: rgba(17, 35, 66, 0.94);
+  box-shadow: 0 8px 22px rgba(18, 56, 114, 0.38);
+}
+
+.auth-new-shell[data-theme='dark'] .auth-pw-helper { color: #9cb7da; }
+.auth-new-shell[data-theme='dark'] .auth-pw-rule.pass { color: #75b0ff; }
+.auth-new-shell[data-theme='dark'] .auth-pw-rule.fail { color: #ef9c9c; }
+
+.auth-new-shell[data-theme='dark'] .auth-forgot-overlay { background: rgba(3, 8, 18, 0.64); }
+.auth-new-shell[data-theme='dark'] .auth-forgot-modal {
+  background: linear-gradient(152deg, rgba(9, 20, 40, 0.97), rgba(11, 28, 54, 0.95));
+  border: 1.5px solid rgba(116, 154, 215, 0.45);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.52), inset 0 2px 12px rgba(109, 148, 210, 0.12);
+}
+.auth-new-shell[data-theme='dark'] .auth-forgot-label { color: #abc4e6; }
+.auth-new-shell[data-theme='dark'] .auth-forgot-info { color: #9cc2f5; }
+.auth-new-shell[data-theme='dark'] .auth-forgot-error { color: #f3a3a3; }
+.auth-new-shell[data-theme='dark'] .auth-forgot-cancel-btn { background: rgba(12, 29, 56, 0.92); color: #b8d2f3; border: 1px solid rgba(102, 136, 194, 0.48); }
+.auth-new-shell[data-theme='dark'] .auth-forgot-cancel-btn:hover { background: rgba(17, 38, 70, 0.95); }
+.auth-new-shell[data-theme='dark'] .auth-forgot-secondary-btn { background: rgba(33, 86, 165, 0.16); border: 1px solid rgba(82, 132, 209, 0.46); color: #bad5f7; }
+.auth-new-shell[data-theme='dark'] .auth-forgot-secondary-btn:hover { background: rgba(39, 97, 184, 0.24); }
+.auth-new-shell[data-theme='dark'] .auth-forgot-link { color: #96bbec; }
+.auth-new-shell[data-theme='dark'] .auth-forgot-link:hover { color: #c0dbff; }
+.auth-new-shell[data-theme='dark'] .auth-msg-error { background: rgba(205, 84, 84, 0.18); color: #f4b2b2; border: 1px solid rgba(226, 95, 95, 0.44); }
+.auth-new-shell[data-theme='dark'] .auth-msg-success { background: rgba(56, 128, 212, 0.2); color: #b9dcff; border: 1px solid rgba(68, 145, 235, 0.45); }
+
 /* RESPONSIVENESS */
 @media (max-width: 1024px) {
   .auth-new-shell {

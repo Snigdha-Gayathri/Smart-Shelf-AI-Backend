@@ -325,7 +325,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   function handleAuthSuccess(a){
     setAuth(a);
     if (a?.user) {
-      localStorage.setItem('auth', JSON.stringify({ user: a.user }));
+      localStorage.setItem('auth', JSON.stringify({ user: a.user, token: a?.token || null }));
     }
     // Load persisted user data from storage after successful login
     if (a?.user?.id) {
@@ -370,13 +370,16 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   async function handleDeleteAccount() {
     if (!auth || !auth.user) return;
     
+    const password = window.prompt("Enter your password to confirm deletion:");
+    if (!password) return;
+
     try {
       const res = await fetch(`${API_BASE}/auth/delete`, {
         method: 'DELETE',
         headers: { 
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username: auth.user.username || auth.user.email })
+        body: JSON.stringify({ username: auth.user.username || auth.user.email, password })
       });
       
       if (res.ok) {
@@ -1096,7 +1099,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         <CursorParticleCanvas theme={theme} />
         <SpaceBackground active={theme === 'dark'} />
         <div className="w-full h-screen overflow-hidden">
-          <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} />
+          <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} theme={theme} />
         </div>
       </>
     );

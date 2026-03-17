@@ -20,7 +20,7 @@ function allPasswordRulesPass(pw) {
   return PASSWORD_RULES.every((r) => r.test(pw))
 }
 
-export default function Auth({ onSuccess, googleAuthEnabled = false }) {
+export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'light' }) {
   /* Sparkle Particle Generator */
   const [sparkles, setSparkles] = useState([])
   const [snowflakes, setSnowflakes] = useState([])
@@ -290,7 +290,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
   }
 
   return (
-    <div className="auth-new-shell" onMouseMove={handleShellMouseMove}>
+    <div className="auth-new-shell" data-theme={theme} onMouseMove={handleShellMouseMove}>
       {/* Decorative Sparkles */}
       <div className="auth-sparkles">
         {sparkles.map(s => (
@@ -324,7 +324,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
               ['--snow-duration']: `${flake.duration}s`,
             }}
           >
-            ❄
+            {theme === 'dark' ? '✦' : '❄'}
           </span>
         ))}
       </div>
