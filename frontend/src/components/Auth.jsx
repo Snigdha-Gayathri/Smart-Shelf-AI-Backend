@@ -124,7 +124,9 @@ export default function Auth({ onSuccess, googleAuthEnabled = false }) {
       localStorage.setItem('auth', JSON.stringify(authPayload))
       setLoginSuccess('✓ Logged in! Loading your library...')
       setLoginLoading(false)
-      window.setTimeout(() => window.location.reload(), 900)
+      window.setTimeout(() => {
+        onSuccess?.(authPayload)
+      }, 350)
     } catch (err) {
       setLoginError(err?.message || 'Server unavailable. Please check the backend.')
     } finally {
