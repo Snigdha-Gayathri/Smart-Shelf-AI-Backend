@@ -11,6 +11,7 @@ const BLUE     = '#1E90FF'
 const GREEN    = '#06D6A0'
 const GOLD     = '#FFD166'
 const ROSE     = '#EF476F'
+const CYAN     = '#22D3EE'
 const CARD_BG  = 'rgba(15,23,42,0.65)'
 const CARD_BORDER = `rgba(30,144,255,0.22)`
 const GLOW     = `0 0 20px ${BLUE}, 0 0 40px rgba(30,144,255,0.6)`
