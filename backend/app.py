@@ -680,28 +680,56 @@ def login_user(payload: LoginRequest):
 
     if not _is_valid_username(normalized_username):
         logger.warning(f"Invalid username format for login: {normalized_username}")
-        return {"status": "error", "error": "Invalid username or password."}
+        return {
+            "status": "error",
+            "error_code": "username_format_invalid",
+            "error": "Username must be 3-32 characters and can include letters, numbers, ., _, and -."
+        }
     try:
         from services import db as db_client
         pwd_ctx = _get_password_context()
 
         user = db_client.get_user_by_username(normalized_username)
         if not user:
+            deleted = db_client.get_deleted_username(normalized_username)
+            if deleted:
+                logger.warning(f"Login attempt for deleted username: {normalized_username}")
+                return {
+                    "status": "error",
+                    "error_code": "username_deleted",
+                    "error": "This username was deleted. Please register again to restore access."
+                }
             logger.warning(f"Login attempt with non-existent username: {normalized_username}")
-            return {"status": "error", "error": "Invalid username or password."}
+            return {
+                "status": "error",
+                "error_code": "username_not_found",
+                "error": "No account exists with this username."
+            }
         stored_hash = user.get("password_hash")
         if not stored_hash:
             logger.warning(f"Login failed for {normalized_username}: missing stored password hash")
-            return {"status": "error", "error": "Invalid username or password."}
+            return {
+                "status": "error",
+                "error_code": "missing_password_hash",
+                "error": "This account has no password set. Use social login or reset your password."
+            }
         logger.info(f"Login: stored hash for {normalized_username} starts with: {stored_hash[:20]}... (len={len(stored_hash)})")
         try:
             password_ok = pwd_ctx.verify(payload.password, stored_hash)
         except Exception as verify_err:
             logger.error(f"Login: pwd_ctx.verify raised exception for {normalized_username}: {verify_err}")
-            return {"status": "error", "error": "Invalid username or password."}
+            return {
+                "status": "error",
+                "error_code": "password_verify_error",
+                "error": "Password verification failed. Please reset your password and try again."
+            }
         if not password_ok:
             logger.warning(f"Login failed for {normalized_username}: invalid password (verify returned False)")
-            return {"status": "error", "error": "Incorrect password. Please try again."}
+            return {
+                "status": "error",
+                "error_code": "password_incorrect",
+                "error": "Incorrect password. Please try again."
+            }
 
         # Minimal token for client-side storage; not used by backend auth yet
         import secrets
@@ -719,7 +747,11 @@ def login_user(payload: LoginRequest):
         }
     except Exception as e:
         logger.error(f"❌ Login error for {normalized_username}: {str(e)}", exc_info=True)
-        return {"status": "error", "error": str(e)}
+        return {
+            "status": "error",
+            "error_code": "login_internal_error",
+            "error": f"Login failed due to a server error: {str(e)}"
+        }
 
 
 @app.delete("/auth/delete")
@@ -1076,6 +1108,25 @@ async def recommend(mood: MoodRequest):
             for book in books
         ]
 
+        def _safe_book_type(book: dict) -> str:
+            raw = str(book.get("type") or "").strip().lower()
+            if raw in {"fiction", "self-help", "self_help", "educational", "education"}:
+                if raw == "self_help":
+                    return "self-help"
+                if raw == "education":
+                    return "educational"
+                return raw
+
+            genre = str(book.get("genre") or "").lower()
+            tags = " ".join([str(t).lower() for t in (book.get("emotion_tags") or [])])
+            if any(k in genre for k in ["psychology", "science", "history", "economics", "philosophy", "education"]):
+                return "educational"
+            if any(k in genre for k in ["self-help", "self help", "productivity", "mindset", "business"]):
+                return "self-help"
+            if any(k in tags for k in ["habit", "discipline", "growth", "mindset"]):
+                return "self-help"
+            return "fiction"
+
         if _ML_AVAILABLE and user_embedding is not None:
             # ---- Load book embeddings (prefer cache) ----
             book_embeddings_matrix = None
@@ -1161,7 +1212,7 @@ async def recommend(mood: MoodRequest):
                         "buy_link": book.get("buy_link"),
                         "synopsis": book.get("synopsis"),
                         "genre": book.get("genre"),
-                        "type": book["type"],
+                        "type": _safe_book_type(book),
                         "emotion_tags": book.get("emotion_tags", []),
                         "reading_insights": book.get("reading_insights"),
                         "mood": book.get("mood"),
@@ -1183,7 +1234,7 @@ async def recommend(mood: MoodRequest):
                         "buy_link": book.get("buy_link"),
                         "synopsis": book.get("synopsis"),
                         "genre": book.get("genre"),
-                        "type": book["type"],
+                        "type": _safe_book_type(book),
                         "emotion_tags": book.get("emotion_tags", []),
                         "reading_insights": book.get("reading_insights"),
                         "mood": book.get("mood"),
@@ -1210,7 +1261,7 @@ async def recommend(mood: MoodRequest):
                     "buy_link": book.get("buy_link"),
                     "synopsis": book.get("synopsis"),
                     "genre": book.get("genre"),
-                    "type": book["type"],
+                    "type": _safe_book_type(book),
                     "emotion_tags": book.get("emotion_tags", []),
                     "reading_insights": book.get("reading_insights"),
                     "mood": book.get("mood"),

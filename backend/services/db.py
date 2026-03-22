@@ -44,6 +44,15 @@ def init_db():
         )
         """
     )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS deleted_usernames (
+            username TEXT PRIMARY KEY,
+            deleted_at TEXT NOT NULL,
+            reason TEXT
+        )
+        """
+    )
     # Lightweight in-place migrations for existing local DB files.
     cur.execute("PRAGMA table_info(previous_books_read)")
     previous_cols = {row[1] for row in cur.fetchall()}
@@ -234,6 +243,13 @@ def delete_user(email: str):
     row = cur.fetchone()
     username = (row[0] or "").strip().lower() if row else ""
 
+    # Keep a tombstone so login can return a precise error.
+    if username:
+        cur.execute(
+            "INSERT OR REPLACE INTO deleted_usernames (username, deleted_at, reason) VALUES (?, ?, ?)",
+            (username, datetime.utcnow().isoformat(), "account_deleted"),
+        )
+
     # Delete user record
     cur.execute("DELETE FROM users WHERE email = ?", (normalized_email,))
 
@@ -257,6 +273,11 @@ def delete_user_by_username(username: str):
     row = cur.fetchone()
     email = (row[0] or "").strip().lower() if row else ""
 
+    cur.execute(
+        "INSERT OR REPLACE INTO deleted_usernames (username, deleted_at, reason) VALUES (?, ?, ?)",
+        (normalized_username, datetime.utcnow().isoformat(), "account_deleted"),
+    )
+
     cur.execute("DELETE FROM users WHERE username = ?", (normalized_username,))
     cur.execute("DELETE FROM previous_books_read WHERE user_identifier = ?", (normalized_username,))
     if email:
@@ -264,6 +285,19 @@ def delete_user_by_username(username: str):
 
     conn.commit()
     conn.close()
+
+
+def get_deleted_username(username: str) -> Dict | None:
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT username, deleted_at, reason FROM deleted_usernames WHERE username = ?",
+        ((username or "").strip().lower(),),
+    )
+    row = cur.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 
 def add_oauth_user(email: str, name: str, profile_picture: str, oauth_provider: str, oauth_provider_id: str, created_at: str | None = None) -> Dict | None:
