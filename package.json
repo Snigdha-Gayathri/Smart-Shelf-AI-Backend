@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "Build wrapper for frontend deployment from monorepo root",
   "scripts": {
-    "build": "npm ci --prefix frontend && npm run build --prefix frontend"
+    "build": "npm ci --prefix frontend && npm run build --prefix frontend && node -e \"const fs=require('fs'); fs.rmSync('dist',{recursive:true,force:true}); fs.cpSync('frontend/dist','dist',{recursive:true});\""
   },
   "engines": {
     "node": ">=20"
