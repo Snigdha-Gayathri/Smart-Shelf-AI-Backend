@@ -5,12 +5,25 @@ import CategoryStyledBookCard from './CategoryStyledBookCard'
 import SkeletonLoader from './SkeletonLoader'
 import { getApiBase } from '../utils/apiBase'
 
+function normalizeKeyPart(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function buildBookKey(book) {
-  const id = String(book?.id || '').trim().toLowerCase()
+  const id = normalizeKeyPart(book?.id)
   if (id) return `id:${id}`
-  const title = String(book?.title || '').trim().toLowerCase()
-  const author = String(book?.author || '').trim().toLowerCase()
+  const title = normalizeKeyPart(book?.title)
+  const author = normalizeKeyPart(book?.author)
   return `ta:${title}::${author}`
+}
+
+function buildLooseTitleKey(book) {
+  return `t:${normalizeKeyPart(book?.title)}`
 }
 
 export default function Recommendations({ recommendations = [], onAddToCurrentlyReading, loading = false, currentUsername = '', currentlyReadingBooks = [] }) {
@@ -18,6 +31,10 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
   const API_BASE = getApiBase()
   const currentlyReadingKeySet = useMemo(
     () => new Set(currentlyReadingBooks.map((book) => buildBookKey(book))),
+    [currentlyReadingBooks]
+  )
+  const currentlyReadingTitleKeySet = useMemo(
+    () => new Set(currentlyReadingBooks.map((book) => buildLooseTitleKey(book))),
     [currentlyReadingBooks]
   )
 
@@ -37,7 +54,9 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
         const normalizedType = rawType === 'self_help' || rawType === 'self help' ? 'self-help' : rawType
         const isEducational = normalizedType === 'educational'
         const isSelfHelp = normalizedType === 'self-help'
-        const isAlreadyCurrentlyReading = currentlyReadingKeySet.has(buildBookKey(book))
+        const isAlreadyCurrentlyReading =
+          currentlyReadingKeySet.has(buildBookKey(book)) ||
+          currentlyReadingTitleKeySet.has(buildLooseTitleKey(book))
 
         return (
           <CategoryStyledBookCard
@@ -58,7 +77,7 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
                     transformOrigin: 'top right',
                   }}
                 >
-                  Already in Currently Reading
+                  Recommended for this mood, already in Currently Reading
                 </span>
               ) : null
             }

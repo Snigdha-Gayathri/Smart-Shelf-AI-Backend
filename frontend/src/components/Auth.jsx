@@ -20,6 +20,27 @@ function allPasswordRulesPass(pw) {
   return PASSWORD_RULES.every((r) => r.test(pw))
 }
 
+function mapLoginError(data, responseStatus) {
+  const code = String(data?.error_code || '').toLowerCase()
+  const backendMessage = String(data?.error || data?.message || '').trim()
+
+  const codeMap = {
+    username_deleted: 'This username was deleted. Please register again to restore access.',
+    username_not_found: 'No account exists with this username.',
+    password_incorrect: 'Incorrect password. Please try again.',
+    username_format_invalid: 'Username must be 3-32 characters and can include letters, numbers, ., _, and -.',
+    missing_password_hash: 'This account has no password set. Use social login or reset your password.',
+    password_verify_error: 'Password verification failed. Please reset your password and try again.',
+    login_internal_error: 'Login failed due to a server issue. Please try again shortly.',
+  }
+
+  if (codeMap[code]) return codeMap[code]
+  if (responseStatus === 429) return 'Too many login attempts. Please wait a moment and try again.'
+  if (responseStatus >= 500) return 'Server error while logging in. Please try again shortly.'
+  if (backendMessage) return backendMessage
+  return 'Unable to login right now. Please try again.'
+}
+
 export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'light' }) {
   /* Sparkle Particle Generator */
   const [sparkles, setSparkles] = useState([])
@@ -116,7 +137,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
       try { data = await res.json() } catch { data = { status: 'error', error: 'Server unavailable. Is the backend running?' } }
 
       if (!res.ok || data.status !== 'ok') {
-        setLoginError(data.error || data.message || 'Invalid username or password.')
+        setLoginError(mapLoginError(data, res.status))
         return
       }
 

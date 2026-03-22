@@ -1037,14 +1037,17 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setLoading(true);
     setError('');
     try {
-      // Ensure backend is ready (caches warmed) before requesting recommendations
-      const readyResp = await fetch(`${API_BASE}/ready`);
-      if (!readyResp.ok) throw new Error('Backend not reachable');
-      const readyJson = await readyResp.json();
-      if (!readyJson.ready) {
-        setError('Backend warming up models — please wait a moment and try again.');
-        setLoading(false);
-        return;
+      // Soft readiness check: if /ready is unavailable we still attempt recommendation endpoint.
+      try {
+        const readyResp = await fetch(`${API_BASE}/ready`);
+        if (readyResp.ok) {
+          const readyJson = await readyResp.json();
+          if (!readyJson.ready) {
+            setError('Backend is warming up models. Trying recommendation anyway...');
+          }
+        }
+      } catch {
+        // Ignore /ready failures and proceed to recommendation request.
       }
 
       const res = await fetch(`${API_BASE}/api/v1/recommend`, {
@@ -1057,16 +1060,26 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         throw new Error(`Server returned ${res.status}: ${txt}`);
       }
       const data = await res.json();
+      if (data?.error) {
+        throw new Error(data.error)
+      }
       
       // Apply feedback filtering to recommendations
       const rawRecommendations = data.recommendations || [];
       const filteredRecommendations = applyFeedbackFiltering(rawRecommendations);
 
-      const reviewAwareRecommendations = applyReviewIntelligence(filteredRecommendations)
+      // If feedback filtering removes everything, fallback to raw results so users still receive recommendations.
+      const recommendationBase = filteredRecommendations.length ? filteredRecommendations : rawRecommendations
+      const reviewAwareRecommendations = applyReviewIntelligence(recommendationBase)
       setRecommendations(reviewAwareRecommendations);
+      if (!reviewAwareRecommendations.length) {
+        setError('No suitable recommendations found for this prompt. Try a different mood or genre.')
+      } else {
+        setError('')
+      }
     } catch (e) {
         console.error('Error details:', e);
-      setError(e.message);
+      setError(e.message || 'Failed to generate recommendations. Please try again.');
     } finally {
       setLoading(false);
     }
