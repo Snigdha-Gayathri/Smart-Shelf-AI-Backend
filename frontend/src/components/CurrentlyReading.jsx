@@ -58,10 +58,8 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
               book={book}
               index={idx}
               statusBadge={
-                <span className={`text-white text-xs font-bold px-2 py-1 rounded-full shadow-sm ${
-                  isFinished ? 'bg-green-600' : 'bg-green-500'
-                }`}>
-                  {isFinished ? '✓ Finished' : '📖 Reading'}
+                <span className="ribbon-banner">
+                  {isFinished ? 'Finished' : 'Currently Reading'}
                 </span>
               }
             >

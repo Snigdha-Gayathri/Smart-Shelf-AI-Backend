@@ -68,16 +68,8 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
             synopsisPreviewChars={140}
             statusBadge={
               isAlreadyCurrentlyReading ? (
-                <span
-                  className="inline-block rounded-md px-2 py-1 text-[10px] sm:text-[11px] font-semibold text-white shadow-md"
-                  style={{
-                    background: 'linear-gradient(135deg, #0EA5E9, #2563EB)',
-                    border: '1px solid rgba(191, 219, 254, 0.7)',
-                    transform: 'rotate(8deg)',
-                    transformOrigin: 'top right',
-                  }}
-                >
-                  Recommended for this mood, already in Currently Reading
+                <span className="ribbon-banner">
+                  Currently Reading
                 </span>
               ) : null
             }

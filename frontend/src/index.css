@@ -376,6 +376,59 @@ section {
   transform: translateY(-6px);
 }
 
+.card-container {
+  position: relative;
+  overflow: visible;
+}
+
+.status-badge-anchor {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.status-badge-anchor > * {
+  pointer-events: auto;
+}
+
+.ribbon-banner {
+  position: absolute;
+  top: 20px;
+  right: -40px;
+  background: linear-gradient(135deg, #1e90ff, #00bfff);
+  color: white;
+  padding: 10px 40px;
+  font-size: 14px;
+  font-weight: 600;
+  transform: rotate(20deg);
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.ribbon-banner::before,
+.ribbon-banner::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  border-width: 8px;
+  border-style: solid;
+}
+
+.ribbon-banner::before {
+  left: 0;
+  border-color: #0d5bb5 transparent transparent transparent;
+}
+
+.ribbon-banner::after {
+  right: 0;
+  border-color: #0d5bb5 transparent transparent transparent;
+}
+
 /* ── Cover image lift on card hover ── */
 .card-cover-lift {
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),

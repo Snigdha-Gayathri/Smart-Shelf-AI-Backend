@@ -127,7 +127,7 @@ export default function CategoryStyledBookCard({
 
   return (
     <div
-      className="category-card relative rounded-2xl p-4 sm:p-5 flex flex-col overflow-hidden"
+      className="category-card card-container relative rounded-2xl p-4 sm:p-5 flex flex-col overflow-visible"
       style={{
         backgroundImage: `url(${bgImage})`,
         backgroundSize: 'cover',
@@ -149,7 +149,7 @@ export default function CategoryStyledBookCard({
 
       {/* Status badge (top-right) */}
       {statusBadge && (
-        <div className="absolute top-2.5 right-2.5 z-10">
+        <div className="status-badge-anchor">
           {statusBadge}
         </div>
       )}
