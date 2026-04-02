@@ -238,43 +238,46 @@ class ReviewUpdatePayload(BaseModel):
     rating: int
     review: str = ""
 
+def _normalize_books_dataset(raw_dataset: Any) -> List[Dict[str, Any]]:
+    """Normalize raw books dataset into a flat list of dict rows."""
+    if isinstance(raw_dataset, dict):
+        raw_dataset = raw_dataset.get("books", [])
+
+    normalized_dataset: List[Dict[str, Any]] = []
+    if isinstance(raw_dataset, list):
+        for idx, row in enumerate(raw_dataset):
+            if isinstance(row, dict):
+                normalized_dataset.append(row)
+            elif isinstance(row, list):
+                nested_dicts = [item for item in row if isinstance(item, dict)]
+                if nested_dicts:
+                    logger.warning(
+                        f"Flattened nested list row at books_data.json index {idx} "
+                        f"({len(nested_dicts)} valid book objects)"
+                    )
+                    normalized_dataset.extend(nested_dicts)
+                else:
+                    logger.warning(f"Skipped malformed nested row at books_data.json index {idx}")
+            else:
+                logger.warning(f"Skipped malformed row at books_data.json index {idx}: {type(row).__name__}")
+    else:
+        logger.error("books_data.json must be a list (or {'books': [...]}); using empty dataset")
+
+    return normalized_dataset
+
 
 def _get_books_dataset() -> List[Dict[str, Any]]:
     """Return the in-memory book dataset, loading from disk if not yet cached."""
     global _BOOKS_DATASET
     if _BOOKS_DATASET:
+        _BOOKS_DATASET = _normalize_books_dataset(_BOOKS_DATASET)
         return _BOOKS_DATASET
     import json as _json
     books_path = Path(__file__).parent / "data" / "books_data.json"
     if books_path.exists():
         with open(books_path, "r", encoding="utf-8") as f:
             raw_dataset = _json.load(f)
-
-        # Accept both list and {"books": [...]} formats, and ignore malformed rows.
-        if isinstance(raw_dataset, dict):
-            raw_dataset = raw_dataset.get("books", [])
-
-        normalized_dataset: List[Dict[str, Any]] = []
-        if isinstance(raw_dataset, list):
-            for idx, row in enumerate(raw_dataset):
-                if isinstance(row, dict):
-                    normalized_dataset.append(row)
-                elif isinstance(row, list):
-                    nested_dicts = [item for item in row if isinstance(item, dict)]
-                    if nested_dicts:
-                        logger.warning(
-                            f"Flattened nested list row at books_data.json index {idx} "
-                            f"({len(nested_dicts)} valid book objects)"
-                        )
-                        normalized_dataset.extend(nested_dicts)
-                    else:
-                        logger.warning(f"Skipped malformed nested row at books_data.json index {idx}")
-                else:
-                    logger.warning(f"Skipped malformed row at books_data.json index {idx}: {type(row).__name__}")
-        else:
-            logger.error("books_data.json must be a list (or {'books': [...]}); using empty dataset")
-
-        _BOOKS_DATASET = normalized_dataset
+        _BOOKS_DATASET = _normalize_books_dataset(raw_dataset)
         logger.info(f"📚 Loaded {len(_BOOKS_DATASET)} books from dataset into memory")
     return _BOOKS_DATASET
 
@@ -542,7 +545,7 @@ async def startup_event():
         _bp = Path(__file__).parent / "data" / "books_data.json"
         if _bp.exists():
             with open(_bp, "r", encoding="utf-8") as _f:
-                _BOOKS_DATASET = _json.load(_f)
+                _BOOKS_DATASET = _normalize_books_dataset(_json.load(_f))
             logger.info(f"✅ Dataset loaded: {len(_BOOKS_DATASET)} books cached in memory")
         else:
             logger.warning("⚠️  books_data.json not found — dataset will be empty")
@@ -577,7 +580,7 @@ async def startup_event():
             if not books:
                 books_path = Path(__file__).parent / "data" / "books_data.json"
                 with open(books_path, 'r', encoding='utf-8') as f:
-                    books = json.load(f)
+                    books = _normalize_books_dataset(json.load(f))
 
             if not book_embedding_cache:
                 logger.info("Building book embeddings cache (this may take a while)...")
