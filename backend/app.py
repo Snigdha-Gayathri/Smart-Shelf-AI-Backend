@@ -248,7 +248,33 @@ def _get_books_dataset() -> List[Dict[str, Any]]:
     books_path = Path(__file__).parent / "data" / "books_data.json"
     if books_path.exists():
         with open(books_path, "r", encoding="utf-8") as f:
-            _BOOKS_DATASET = _json.load(f)
+            raw_dataset = _json.load(f)
+
+        # Accept both list and {"books": [...]} formats, and ignore malformed rows.
+        if isinstance(raw_dataset, dict):
+            raw_dataset = raw_dataset.get("books", [])
+
+        normalized_dataset: List[Dict[str, Any]] = []
+        if isinstance(raw_dataset, list):
+            for idx, row in enumerate(raw_dataset):
+                if isinstance(row, dict):
+                    normalized_dataset.append(row)
+                elif isinstance(row, list):
+                    nested_dicts = [item for item in row if isinstance(item, dict)]
+                    if nested_dicts:
+                        logger.warning(
+                            f"Flattened nested list row at books_data.json index {idx} "
+                            f"({len(nested_dicts)} valid book objects)"
+                        )
+                        normalized_dataset.extend(nested_dicts)
+                    else:
+                        logger.warning(f"Skipped malformed nested row at books_data.json index {idx}")
+                else:
+                    logger.warning(f"Skipped malformed row at books_data.json index {idx}: {type(row).__name__}")
+        else:
+            logger.error("books_data.json must be a list (or {'books': [...]}); using empty dataset")
+
+        _BOOKS_DATASET = normalized_dataset
         logger.info(f"📚 Loaded {len(_BOOKS_DATASET)} books from dataset into memory")
     return _BOOKS_DATASET
 
