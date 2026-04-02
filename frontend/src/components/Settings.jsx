@@ -131,8 +131,6 @@ export default function Settings({
   onUpdateReview,
   onDeleteReview,
 }) {
-    const profilePictureStorageKey = userId ? `user_${userId}_profilePicture` : 'profilePicture'
-
   const [profilePicture, setProfilePicture] = useState(null)
   const [uploadMessage, setUploadMessage] = useState('')
   const fileInputRef = useRef(null)
