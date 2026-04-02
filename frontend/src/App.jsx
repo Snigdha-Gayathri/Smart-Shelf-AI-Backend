@@ -115,6 +115,30 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('introduction');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const buildAuthHeaders = () => {
+    const token = auth?.token;
+    const userId = auth?.user?.id;
+    const username = auth?.user?.username || auth?.user?.email;
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (userId) headers['X-User-Id'] = String(userId);
+    if (username) headers['X-Username'] = String(username).toLowerCase();
+    return headers;
+  };
+  
+  const resetUserScopedState = () => {
+    setCurrentlyReading([]);
+    setEducationalBooks([]);
+    setPreviousReads([]);
+    setUserFeedback(DEFAULT_USER_FEEDBACK);
+    setPersonalityProfile(null);
+    setAnnualWrapped(null);
+    setReviews([]);
+    setReviewInsights(DEFAULT_REVIEW_INSIGHTS);
+    setUserPreferenceModel({});
+    setRecommendations([]);
+    setError('');
+  };
 
   useEffect(() => {
     if (window.location.pathname === '/author-dashboard') {
@@ -323,6 +347,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
   // Handle successful authentication - hydrate persisted user data
   function handleAuthSuccess(a){
+    // Always clear in-memory user state before hydrating next account.
+    resetUserScopedState();
     setAuth(a);
     if (a?.user) {
       localStorage.setItem(
@@ -355,6 +381,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setIsLoggingOut(true);
     const finish = () => {
       localStorage.removeItem('auth');
+      resetUserScopedState();
       setAuth(null);
       setUserSettings(loadUserSettings('guest'));
       setMenuOpen(false);
@@ -385,9 +412,18 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         method: 'DELETE',
         headers: { 
           'Content-Type': 'application/json',
+          ...buildAuthHeaders(),
         },
         body: JSON.stringify({ username: auth.user.username || auth.user.email, password })
       });
+              headers: {
+                ...buildAuthHeaders(),
+              },
+            });
+                headers: {
+                  ...buildAuthHeaders(),
+                },
+              })
       
       if (res.ok) {
         // Explicitly delete all persisted user data from storage before logout
@@ -550,7 +586,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     try {
       await fetch(`${API_BASE}/api/v1/reviews`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
         body: JSON.stringify(reviewEntry),
       })
     } catch {
@@ -562,7 +598,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     try {
       await fetch(`${API_BASE}/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
         body: JSON.stringify(payload),
       })
     } catch {
@@ -574,6 +610,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     try {
       await fetch(`${API_BASE}/api/v1/reviews/${encodeURIComponent(reviewId)}`, {
         method: 'DELETE',
+        headers: { ...buildAuthHeaders() },
       })
     } catch {
       // keep local delete even if backend delete fails
@@ -1113,8 +1150,12 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
       const res = await fetch(`${API_BASE}/api/v1/recommend`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: prompt })
+        headers: { 'Content-Type': 'application/json', ...buildAuthHeaders() },
+        body: JSON.stringify({
+          text: prompt,
+          username: auth?.user?.username || auth?.user?.email || null,
+          user_id: auth?.user?.id || null,
+        })
       });
       if (!res.ok) {
         const txt = await res.text();
@@ -1380,6 +1421,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
           <section className="w-full space-y-6 sm:space-y-8 page-fade-in">
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary dark:text-primary">⚙️ Settings</h2>
             <Settings 
+              userId={auth?.user?.id}
               theme={theme}
               userSettings={userSettings}
               onUpdateSetting={handleUserSettingChange}

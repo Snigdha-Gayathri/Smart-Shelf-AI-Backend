@@ -115,6 +115,7 @@ function ToggleRow({ label, description, enabled, onToggle }) {
 }
 
 export default function Settings({
+  userId,
   theme,
   userSettings,
   onUpdateSetting,
@@ -130,6 +131,8 @@ export default function Settings({
   onUpdateReview,
   onDeleteReview,
 }) {
+    const profilePictureStorageKey = userId ? `user_${userId}_profilePicture` : 'profilePicture'
+
   const [profilePicture, setProfilePicture] = useState(null)
   const [uploadMessage, setUploadMessage] = useState('')
   const fileInputRef = useRef(null)
@@ -164,9 +167,10 @@ export default function Settings({
   const readingGoalProgress = Math.min(100, Math.round((previousReads.length / Math.max(1, Number(userSettings?.readingGoal || 1))) * 100))
 
   useEffect(() => {
-    const saved = localStorage.getItem('profilePicture')
+    const saved = localStorage.getItem(profilePictureStorageKey)
     if (saved) setProfilePicture(saved)
-  }, [])
+    else setProfilePicture(null)
+  }, [profilePictureStorageKey])
 
   const passwordRuleMessage = 'Password must contain: 8-16 characters, letters, numbers, and at least one special character.'
 
@@ -241,7 +245,7 @@ export default function Settings({
     const reader = new FileReader()
     reader.onloadend = () => {
       setProfilePicture(reader.result)
-      localStorage.setItem('profilePicture', reader.result)
+      localStorage.setItem(profilePictureStorageKey, reader.result)
       setUploadMessage('Profile picture updated!')
       setTimeout(() => setUploadMessage(''), 3000)
     }
@@ -251,7 +255,7 @@ export default function Settings({
   const handleDeleteProfilePicture = () => {
     setProfilePicture(null)
     try {
-      localStorage.removeItem('profilePicture')
+      localStorage.removeItem(profilePictureStorageKey)
     } catch {}
     setUploadMessage('Profile picture removed')
     setTimeout(() => setUploadMessage(''), 3000)
