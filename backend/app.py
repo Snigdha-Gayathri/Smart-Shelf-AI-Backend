@@ -523,6 +523,97 @@ def _detect_author_query(prompt: str, books: List[Dict[str, Any]]) -> Optional[s
     return None
 
 
+_MOOD_KEYWORD_GROUPS: Dict[str, set] = {
+    "sadness": {
+        "sad", "low", "down", "depressed", "heartbroken", "grief", "grieving",
+        "lonely", "melancholy", "melancholic", "sorrow", "cry", "tearful",
+    },
+    "anger": {
+        "angry", "anger", "furious", "rage", "resentment", "resentful",
+        "frustrated", "frustration", "irritated", "mad",
+    },
+    "anxiety": {
+        "anxious", "anxiety", "panic", "worried", "overthinking", "stress", "stressed", "fear",
+    },
+    "comfort": {
+        "comfort", "comforting", "healing", "cozy", "hopeful", "uplifting", "gentle", "warm",
+    },
+    "dark": {
+        "dark", "intense", "gritty", "violent", "revenge", "twisted", "obsessive", "toxic",
+    },
+}
+
+
+def _extract_target_mood_groups(query_text: str, compound_emotions: Optional[Dict[str, float]] = None) -> List[str]:
+    tokens = set(re.findall(r"[a-z']+", (query_text or "").lower()))
+    target_groups: List[str] = []
+
+    for group, keywords in _MOOD_KEYWORD_GROUPS.items():
+        if tokens & keywords:
+            target_groups.append(group)
+
+    emotion_to_group = {
+        "sadness": "sadness",
+        "grief": "sadness",
+        "anger": "anger",
+        "annoyance": "anger",
+        "disapproval": "anger",
+        "fear": "anxiety",
+        "nervousness": "anxiety",
+        "anxiety": "anxiety",
+        "disappointment": "sadness",
+    }
+    if compound_emotions:
+        for emotion, score in compound_emotions.items():
+            if float(score) >= 0.2:
+                mapped = emotion_to_group.get(str(emotion).lower())
+                if mapped and mapped not in target_groups:
+                    target_groups.append(mapped)
+
+    return target_groups
+
+
+def _score_book_mood_alignment(
+    query_text: str,
+    compound_emotions: Optional[Dict[str, float]],
+    book: Dict[str, Any],
+) -> float:
+    """Score how well a book matches explicit mood intent (0.0-1.0)."""
+    target_groups = _extract_target_mood_groups(query_text, compound_emotions)
+    if not target_groups:
+        return 0.5
+
+    tag_values = []
+    for value in (book.get("emotion_tags") or []):
+        tag_values.append(str(value).lower())
+    for value in (book.get("embedding_tags") or []):
+        tag_values.append(str(value).lower())
+
+    signal_text = " ".join([
+        str(book.get("mood") or "").lower(),
+        str(book.get("tone") or "").lower(),
+        str(book.get("genre") or "").lower(),
+        " ".join(tag_values),
+    ])
+    signal_tokens = set(re.findall(r"[a-z']+", signal_text))
+
+    if not signal_tokens:
+        return 0.25
+
+    group_scores: List[float] = []
+    for group in target_groups:
+        keywords = _MOOD_KEYWORD_GROUPS.get(group, set())
+        if not keywords:
+            continue
+        overlap = len(signal_tokens & keywords)
+        group_scores.append(min(1.0, overlap / 2.0))
+
+    if not group_scores:
+        return 0.25
+
+    return float(sum(group_scores) / len(group_scores))
+
+
 # Warmup quantum emotion pipeline on startup (if available)
 @app.on_event("startup")
 async def startup_event():
@@ -1255,10 +1346,17 @@ async def recommend(mood: MoodRequest):
                     quantum_scores = np.zeros(n_books, dtype=np.float64)
                     quantum_method = "failed_fallback_zero"
 
-                # ---- Hybrid scoring ----
-                hybrid_scores = 0.65 * cosine_scores + 0.35 * quantum_scores
+                # ---- Hybrid scoring with explicit mood-alignment prior ----
+                base_scores = 0.65 * cosine_scores + 0.35 * quantum_scores
+                compound_emotions = user_analysis.get("compound_emotions", {})
+                target_mood_groups = _extract_target_mood_groups(text, compound_emotions)
 
                 for idx, book in enumerate(books):
+                    mood_alignment = _score_book_mood_alignment(text, compound_emotions, book)
+                    final_score = 0.72 * float(base_scores[idx]) + 0.28 * mood_alignment
+                    if target_mood_groups and mood_alignment < 0.1:
+                        final_score -= 0.08
+
                     recommendations.append({
                         "title": book.get("title"),
                         "author": book.get("author"),
@@ -1273,10 +1371,11 @@ async def recommend(mood: MoodRequest):
                         "tone": book.get("tone"),
                         "pacing": book.get("pacing"),
                         "personality_vector": book.get("personality_vector", []),
-                        "score": float(hybrid_scores[idx]),
-                        "matchScore": float(hybrid_scores[idx]),
+                        "score": float(final_score),
+                        "matchScore": float(final_score),
                         "classical_similarity": float(cosine_scores[idx]),
                         "quantum_similarity": float(quantum_scores[idx]),
+                        "mood_alignment": float(mood_alignment),
                     })
             else:
                 # Embeddings unavailable — zero scores
@@ -1308,6 +1407,12 @@ async def recommend(mood: MoodRequest):
             for idx, book in enumerate(books):
                 book_description = book_descriptions[idx]
                 classical_sim = fallback_recommend_similarity(text, book_description)
+                mood_alignment = _score_book_mood_alignment(
+                    text,
+                    user_analysis.get("compound_emotions", {}),
+                    book,
+                )
+                final_score = 0.75 * float(classical_sim) + 0.25 * mood_alignment
                 recommendations.append({
                     "title": book.get("title"),
                     "author": book.get("author"),
@@ -1322,10 +1427,11 @@ async def recommend(mood: MoodRequest):
                     "tone": book.get("tone"),
                     "pacing": book.get("pacing"),
                     "personality_vector": book.get("personality_vector", []),
-                    "score": float(classical_sim),
-                    "matchScore": float(classical_sim),
+                    "score": float(final_score),
+                    "matchScore": float(final_score),
                     "classical_similarity": float(classical_sim),
                     "quantum_similarity": 0.0,
+                    "mood_alignment": float(mood_alignment),
                 })
 
         # Sort by matchScore descending (strict)
