@@ -165,6 +165,31 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setError('');
   };
 
+  const buildAuthHeaders = () => {
+    const token = auth?.token;
+    const userId = auth?.user?.id;
+    const username = auth?.user?.username || auth?.user?.email;
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (userId) headers['X-User-Id'] = String(userId);
+    if (username) headers['X-Username'] = String(username).toLowerCase();
+    return headers;
+  };
+
+  const resetUserScopedState = () => {
+    setCurrentlyReading([]);
+    setEducationalBooks([]);
+    setPreviousReads([]);
+    setUserFeedback(DEFAULT_USER_FEEDBACK);
+    setPersonalityProfile(null);
+    setAnnualWrapped(null);
+    setReviews([]);
+    setReviewInsights(DEFAULT_REVIEW_INSIGHTS);
+    setUserPreferenceModel({});
+    setRecommendations([]);
+    setError('');
+  };
+
   useEffect(() => {
     if (window.location.pathname === '/author-dashboard') {
       setActiveSection('author_dashboard')
