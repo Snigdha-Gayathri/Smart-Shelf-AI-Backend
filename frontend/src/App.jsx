@@ -376,11 +376,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
   // Handle successful authentication - hydrate persisted user data
   function handleAuthSuccess(a){
-<<<<<<< Updated upstream
-    // Always clear in-memory user state before hydrating next account.
-=======
     // Clear prior in-memory session state before hydrating this user.
->>>>>>> Stashed changes
     resetUserScopedState();
     setAuth(a);
     if (a?.user) {
