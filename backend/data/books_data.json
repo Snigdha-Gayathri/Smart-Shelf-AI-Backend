@@ -15580,7 +15580,7 @@
     "mood": "technical systematic",
     "tone": "academic rigorous",
     "pacing": "slow dense",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.2,
       0.3,
@@ -15619,7 +15619,7 @@
     "mood": "technical accessible",
     "tone": "clear instructional",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.2,
       0.3,
@@ -15658,7 +15658,7 @@
     "mood": "technical reference",
     "tone": "precise technical",
     "pacing": "reference use",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15697,7 +15697,7 @@
     "mood": "technical instructional",
     "tone": "academic structured",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.15,
       0.25,
@@ -15736,7 +15736,7 @@
     "mood": "technical rigorous",
     "tone": "academic detailed",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.15,
       0.25,
@@ -15775,7 +15775,7 @@
     "mood": "technical systematic",
     "tone": "mathematical precise",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15814,7 +15814,7 @@
     "mood": "technical instructional",
     "tone": "academic rigorous",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15853,7 +15853,7 @@
     "mood": "technical comprehensive",
     "tone": "academic precise",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15892,7 +15892,7 @@
     "mood": "technical practical",
     "tone": "academic structured",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15931,7 +15931,7 @@
     "mood": "technical reference",
     "tone": "academic precise",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -15970,7 +15970,7 @@
     "mood": "study-focused systematic",
     "tone": "concise structured",
     "pacing": "self-paced",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -16009,7 +16009,7 @@
     "mood": "technical comprehensive",
     "tone": "academic rigorous",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -16048,7 +16048,7 @@
     "mood": "technical instructional",
     "tone": "academic clear",
     "pacing": "slow",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.1,
       0.2,
@@ -16088,7 +16088,7 @@
     "mood": "thrilling inspiring",
     "tone": "engaging candid",
     "pacing": "fast",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.5,
       0.55,
@@ -16127,7 +16127,7 @@
     "mood": "practical humorous",
     "tone": "frank engaging",
     "pacing": "fast",
-    "type": "non-fiction",
+    "type": "educational",
     "personality_vector": [
       0.35,
       0.3,
