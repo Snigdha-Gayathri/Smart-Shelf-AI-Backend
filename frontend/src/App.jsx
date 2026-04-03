@@ -437,7 +437,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   // Handle adding a book to currently reading (or educational learning)
   function handleAddToCurrentlyReading(book) {
     const bookId = book.id || `${book.title}-${book.author}`;
-    const isEducational = book.type === 'educational';
+    const normalizedShelfType = String(book.type || book.category || '').trim().toLowerCase();
+    const isEducational = normalizedShelfType === 'educational';
 
     if (isEducational) {
       // Educational books go to separate educational list

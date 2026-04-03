@@ -26,6 +26,11 @@ function buildLooseTitleKey(book) {
   return `t:${normalizeKeyPart(book?.title)}`
 }
 
+function isEducationalBook(book) {
+  const raw = String(book?.type || book?.category || '').trim().toLowerCase()
+  return raw === 'educational'
+}
+
 export default function Recommendations({ recommendations = [], onAddToCurrentlyReading, loading = false, currentUsername = '', currentlyReadingBooks = [] }) {
   const [message, setMessage] = useState('')
   const API_BASE = getApiBase()
@@ -52,7 +57,7 @@ export default function Recommendations({ recommendations = [], onAddToCurrently
       {recommendations.map((book, idx) => {
         const rawType = String(book.type || '').trim().toLowerCase()
         const normalizedType = rawType === 'self_help' || rawType === 'self help' ? 'self-help' : rawType
-        const isEducational = normalizedType === 'educational'
+        const isEducational = isEducationalBook(book)
         const isSelfHelp = normalizedType === 'self-help'
         const isAlreadyCurrentlyReading =
           currentlyReadingKeySet.has(buildBookKey(book)) ||

@@ -57,11 +57,6 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
               key={book.id}
               book={book}
               index={idx}
-              statusBadge={
-                <span className="ribbon-banner">
-                  {isFinished ? 'Finished' : 'Currently Reading'}
-                </span>
-              }
             >
               <div className="w-full text-xs text-slate-300 mb-2">
                 Progress: {isFinished ? '100%' : 'In progress'}
