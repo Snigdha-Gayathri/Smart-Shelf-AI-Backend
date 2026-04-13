@@ -8,6 +8,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 import logging
 from datetime import datetime
+auth_sessions: dict[str, dict] = {}
 import re
 from typing import Optional, List, Dict, Any
 from uuid import uuid4
@@ -158,6 +159,7 @@ _AUTHOR_WEBSITE_MAP: Dict[str, str] = {}
 # In-memory stores with short-lived entries; replace with real SMS provider later.
 otp_store: dict[str, dict] = {}
 verified_sessions: dict[str, dict] = {}
+auth_sessions: dict[str, dict] = {}
 OTP_TTL_SECONDS = 300
 VERIFIED_SESSION_TTL_SECONDS = 600
 
@@ -169,6 +171,54 @@ def _hash_otp(username: str, otp: str) -> str:
     payload = f"{username}:{otp}:{secret}".encode("utf-8")
     return hashlib.sha256(payload).hexdigest()
 
+
+def _extract_bearer_token(request: Request) -> Optional[str]:
+    auth_header = request.headers.get("Authorization") or ""
+    if not auth_header.lower().startswith("bearer "):
+        return None
+    token = auth_header.split(" ", 1)[1].strip()
+    return token or None
+
+
+def _get_auth_session(request: Request) -> Optional[Dict[str, Any]]:
+    token = _extract_bearer_token(request)
+    if not token:
+        return None
+    session = auth_sessions.get(token)
+    if not session:
+        return None
+    return session
+
+
+def _resolve_request_user_context(request: Request) -> Dict[str, Optional[str]]:
+    session = _get_auth_session(request)
+    if session:
+        return {
+            "user_id": str(session.get("user_id")) if session.get("user_id") is not None else None,
+            "username": str(session.get("username")) if session.get("username") is not None else None,
+            "token": str(session.get("token")) if session.get("token") is not None else None,
+        }
+    # Backward-compatible fallback for internal/testing calls.
+    header_user_id = (request.headers.get("X-User-Id") or "").strip() or None
+    header_username = (request.headers.get("X-Username") or "").strip().lower() or None
+    return {
+        "user_id": header_user_id,
+        "username": header_username,
+        "token": None,
+    }
+
+
+@app.middleware("http")
+async def request_user_logging_middleware(request: Request, call_next):
+    ctx = _resolve_request_user_context(request)
+    request.state.auth_user_id = ctx.get("user_id")
+    request.state.auth_username = ctx.get("username")
+    logger.info(
+        f"REQ {request.method} {request.url.path} user_id={request.state.auth_user_id or '-'} "
+        f"username={request.state.auth_username or '-'}"
+    )
+    response = await call_next(request)
+    return response
 
 def _make_placeholder_cover_dataurl(title: str, author: str = '', width: int = 400, height: int = 600) -> str:
     """Return a data URL containing a simple SVG placeholder for a book cover.
@@ -254,17 +304,46 @@ class ReviewUpdatePayload(BaseModel):
     rating: int
     review: str = ""
 
+def _normalize_books_dataset(raw_dataset: Any) -> List[Dict[str, Any]]:
+    """Normalize raw books dataset into a flat list of dict rows."""
+    if isinstance(raw_dataset, dict):
+        raw_dataset = raw_dataset.get("books", [])
+
+    normalized_dataset: List[Dict[str, Any]] = []
+    if isinstance(raw_dataset, list):
+        for idx, row in enumerate(raw_dataset):
+            if isinstance(row, dict):
+                normalized_dataset.append(row)
+            elif isinstance(row, list):
+                nested_dicts = [item for item in row if isinstance(item, dict)]
+                if nested_dicts:
+                    logger.warning(
+                        f"Flattened nested list row at books_data.json index {idx} "
+                        f"({len(nested_dicts)} valid book objects)"
+                    )
+                    normalized_dataset.extend(nested_dicts)
+                else:
+                    logger.warning(f"Skipped malformed nested row at books_data.json index {idx}")
+            else:
+                logger.warning(f"Skipped malformed row at books_data.json index {idx}: {type(row).__name__}")
+    else:
+        logger.error("books_data.json must be a list (or {'books': [...]}); using empty dataset")
+
+    return normalized_dataset
+
 
 def _get_books_dataset() -> List[Dict[str, Any]]:
     """Return the in-memory book dataset, loading from disk if not yet cached."""
     global _BOOKS_DATASET
     if _BOOKS_DATASET:
+        _BOOKS_DATASET = _normalize_books_dataset(_BOOKS_DATASET)
         return _BOOKS_DATASET
     import json as _json
     books_path = Path(__file__).parent / "data" / "books_data.json"
     if books_path.exists():
         with open(books_path, "r", encoding="utf-8") as f:
-            _BOOKS_DATASET = _json.load(f)
+            raw_dataset = _json.load(f)
+        _BOOKS_DATASET = _normalize_books_dataset(raw_dataset)
         logger.info(f"📚 Loaded {len(_BOOKS_DATASET)} books from dataset into memory")
     return _BOOKS_DATASET
 
@@ -510,6 +589,189 @@ def _detect_author_query(prompt: str, books: List[Dict[str, Any]]) -> Optional[s
     return None
 
 
+_MOOD_KEYWORD_GROUPS: Dict[str, set] = {
+    "sadness": {
+        "sad", "low", "down", "depressed", "heartbroken", "grief", "grieving",
+        "lonely", "melancholy", "melancholic", "sorrow", "cry", "tearful",
+    },
+    "anger": {
+        "angry", "anger", "furious", "rage", "resentment", "resentful",
+        "frustrated", "frustration", "irritated", "mad",
+    },
+    "anxiety": {
+        "anxious", "anxiety", "panic", "worried", "overthinking", "stress", "stressed", "fear",
+    },
+    "comfort": {
+        "comfort", "comforting", "healing", "cozy", "hopeful", "uplifting", "gentle", "warm",
+    },
+    "dark": {
+        "dark", "intense", "gritty", "violent", "revenge", "twisted", "obsessive", "toxic",
+    },
+}
+
+
+def _extract_target_mood_groups(query_text: str, compound_emotions: Optional[Dict[str, float]] = None) -> List[str]:
+    tokens = set(re.findall(r"[a-z']+", (query_text or "").lower()))
+    target_groups: List[str] = []
+
+    for group, keywords in _MOOD_KEYWORD_GROUPS.items():
+        if tokens & keywords:
+            target_groups.append(group)
+
+    emotion_to_group = {
+        "sadness": "sadness",
+        "grief": "sadness",
+        "anger": "anger",
+        "annoyance": "anger",
+        "disapproval": "anger",
+        "fear": "anxiety",
+        "nervousness": "anxiety",
+        "anxiety": "anxiety",
+        "disappointment": "sadness",
+    }
+    if compound_emotions:
+        for emotion, score in compound_emotions.items():
+            if float(score) >= 0.2:
+                mapped = emotion_to_group.get(str(emotion).lower())
+                if mapped and mapped not in target_groups:
+                    target_groups.append(mapped)
+
+    return target_groups
+
+
+def _score_book_mood_alignment(
+    query_text: str,
+    compound_emotions: Optional[Dict[str, float]],
+    book: Dict[str, Any],
+) -> float:
+    """Score how well a book matches explicit mood intent (0.0-1.0)."""
+    target_groups = _extract_target_mood_groups(query_text, compound_emotions)
+    if not target_groups:
+        return 0.5
+
+    tag_values = []
+    for value in (book.get("emotion_tags") or []):
+        tag_values.append(str(value).lower())
+    for value in (book.get("embedding_tags") or []):
+        tag_values.append(str(value).lower())
+
+    signal_text = " ".join([
+        str(book.get("mood") or "").lower(),
+        str(book.get("tone") or "").lower(),
+        str(book.get("genre") or "").lower(),
+        " ".join(tag_values),
+    ])
+    signal_tokens = set(re.findall(r"[a-z']+", signal_text))
+
+    if not signal_tokens:
+        return 0.25
+
+    group_scores: List[float] = []
+    for group in target_groups:
+        keywords = _MOOD_KEYWORD_GROUPS.get(group, set())
+        if not keywords:
+            continue
+        overlap = len(signal_tokens & keywords)
+        group_scores.append(min(1.0, overlap / 2.0))
+
+    if not group_scores:
+        return 0.25
+
+    return float(sum(group_scores) / len(group_scores))
+
+
+def _score_book_trope_relevance(target_groups: List[str], book: Dict[str, Any]) -> float:
+    """Approximate trope relevance score (0.0-1.0) from tags/tone/genre tokens."""
+    if not target_groups:
+        return 0.5
+
+    trope_map: Dict[str, set] = {
+        "sadness": {"healing", "comfort", "cozy", "hope", "heartwarming", "recovery", "gentle"},
+        "comfort": {"comfort", "cozy", "soft", "warm", "safe", "uplifting", "found family"},
+        "anger": {"revenge", "justice", "cathartic", "survival", "rage", "defiance", "fight"},
+        "anxiety": {"calm", "mindfulness", "grounding", "slow", "gentle", "safe"},
+        "dark": {"dark", "gritty", "intense", "twisted", "obsession"},
+    }
+
+    signal_text = " ".join([
+        str(book.get("genre") or "").lower(),
+        str(book.get("mood") or "").lower(),
+        str(book.get("tone") or "").lower(),
+        " ".join([str(v).lower() for v in (book.get("emotion_tags") or [])]),
+        " ".join([str(v).lower() for v in (book.get("embedding_tags") or [])]),
+    ])
+    signal_tokens = set(re.findall(r"[a-z']+", signal_text))
+    if not signal_tokens:
+        return 0.25
+
+    scores: List[float] = []
+    for group in target_groups:
+        candidates = trope_map.get(group, set())
+        if not candidates:
+            continue
+        overlap = len(signal_tokens & candidates)
+        scores.append(min(1.0, overlap / 2.0))
+
+    if not scores:
+        return 0.25
+    return float(sum(scores) / len(scores))
+
+
+def _is_book_incompatible_with_mood(target_groups: List[str], book: Dict[str, Any]) -> bool:
+    """Hard-filter books with tone/genre opposite to requested mood intent."""
+    if not target_groups:
+        return False
+
+    signal_text = " ".join([
+        str(book.get("genre") or "").lower(),
+        str(book.get("mood") or "").lower(),
+        str(book.get("tone") or "").lower(),
+        " ".join([str(v).lower() for v in (book.get("emotion_tags") or [])]),
+        " ".join([str(v).lower() for v in (book.get("embedding_tags") or [])]),
+    ])
+
+    # Safety rules for vulnerable moods.
+    if "sadness" in target_groups or "comfort" in target_groups:
+        banned_for_sad = {
+            "erotic", "dark romance", "noncon", "dubcon", "high dominance", "dominant", "bdsm",
+            "possessive", "obsessive", "mafia", "violent", "brutal", "abuse", "toxic",
+        }
+        if any(term in signal_text for term in banned_for_sad):
+            return True
+
+    if "anxiety" in target_groups:
+        anxiety_banned = {"intense", "panic", "gore", "extreme horror", "brutal", "disturbing"}
+        if any(term in signal_text for term in anxiety_banned):
+            return True
+
+    return False
+
+
+def _build_safe_comfort_recommendations(books: List[Dict[str, Any]], limit: int = 10) -> List[Dict[str, Any]]:
+    """Fallback recommendations for low-confidence negative moods."""
+    comfort_keywords = {
+        "comfort", "cozy", "healing", "heartwarming", "hope", "uplifting", "gentle", "safe",
+    }
+
+    scored: List[Dict[str, Any]] = []
+    for book in books:
+        if _is_book_incompatible_with_mood(["sadness", "comfort"], book):
+            continue
+        signal_text = " ".join([
+            str(book.get("genre") or "").lower(),
+            str(book.get("mood") or "").lower(),
+            str(book.get("tone") or "").lower(),
+            " ".join([str(v).lower() for v in (book.get("emotion_tags") or [])]),
+            " ".join([str(v).lower() for v in (book.get("embedding_tags") or [])]),
+        ])
+        tokens = set(re.findall(r"[a-z']+", signal_text))
+        comfort_score = len(tokens & comfort_keywords)
+        scored.append({"book": book, "comfort_score": comfort_score})
+
+    scored.sort(key=lambda item: item["comfort_score"], reverse=True)
+    return [item["book"] for item in scored[:limit]]
+
+
 # Warmup quantum emotion pipeline on startup (if available)
 @app.on_event("startup")
 async def startup_event():
@@ -532,7 +794,7 @@ async def startup_event():
         _bp = Path(__file__).parent / "data" / "books_data.json"
         if _bp.exists():
             with open(_bp, "r", encoding="utf-8") as _f:
-                _BOOKS_DATASET = _json.load(_f)
+                _BOOKS_DATASET = _normalize_books_dataset(_json.load(_f))
             logger.info(f"✅ Dataset loaded: {len(_BOOKS_DATASET)} books cached in memory")
         else:
             logger.warning("⚠️  books_data.json not found — dataset will be empty")
@@ -567,7 +829,7 @@ async def startup_event():
             if not books:
                 books_path = Path(__file__).parent / "data" / "books_data.json"
                 with open(books_path, 'r', encoding='utf-8') as f:
-                    books = json.load(f)
+                    books = _normalize_books_dataset(json.load(f))
 
             if not book_embedding_cache:
                 logger.info("Building book embeddings cache (this may take a while)...")
@@ -782,9 +1044,15 @@ def login_user(payload: LoginRequest):
                 "error": "Incorrect password. Please try again."
             }
 
-        # Minimal token for client-side storage; not used by backend auth yet
+        # Create a lightweight server-side session token for request user context.
         import secrets
         token = secrets.token_urlsafe(24)
+        auth_sessions[token] = {
+            "token": token,
+            "user_id": user.get("id"),
+            "username": normalized_username,
+            "created_at": datetime.utcnow().isoformat(),
+        }
         logger.info(f"✅ Login successful for: {normalized_username}")
         return {
             "status": "ok",
@@ -1131,7 +1399,7 @@ def change_password(payload: ChangePasswordPayload):
         logger.error(f"Change password error: {e}")
         return {"status": "error", "error": str(e)}
 @app.post("/api/v1/recommend")
-async def recommend(mood: MoodRequest):
+async def recommend(mood: MoodRequest, request: Request):
     """
     Local book recommendation endpoint.
     Uses enhanced quantum emotion pipeline + local book dataset.
@@ -1157,6 +1425,11 @@ async def recommend(mood: MoodRequest):
             text = normalize_query_text(mood.text)
         except ValueError as ve:
             return JSONResponse(status_code=400, content={"error": str(ve)})
+        req_ctx = _resolve_request_user_context(request)
+        logger.info(
+            f"Recommendation user context user_id={req_ctx.get('user_id') or '-'} "
+            f"username={req_ctx.get('username') or '-'}"
+        )
         logger.info(f"🔎 Recommendation request: '{text[:80]}'")
 
         # ── Use in-memory dataset (loaded once at startup) ──
@@ -1187,6 +1460,21 @@ async def recommend(mood: MoodRequest):
             else:
                 books = _filter_books_by_query(books, text)
                 logger.info(f"After query filter: {len(books)} candidate books")
+
+        # Mood safety filter BEFORE ranking to remove incompatible tones.
+        pre_rank_targets = _extract_target_mood_groups(text)
+        if pre_rank_targets:
+            compatible_books = [b for b in books if not _is_book_incompatible_with_mood(pre_rank_targets, b)]
+            if len(compatible_books) >= 5:
+                logger.info(
+                    f"Applied mood safety filter ({pre_rank_targets}): "
+                    f"{len(compatible_books)}/{len(books)} candidates retained"
+                )
+                books = compatible_books
+            else:
+                logger.info(
+                    f"Mood safety filter too strict ({len(compatible_books)} hits) — using unfiltered set of {len(books)}"
+                )
 
         if not books:
             logger.warning("No books available after applying requested type filter")
@@ -1331,10 +1619,23 @@ async def recommend(mood: MoodRequest):
                     quantum_scores = np.zeros(n_books, dtype=np.float64)
                     quantum_method = "failed_fallback_zero"
 
-                # ---- Hybrid scoring ----
-                hybrid_scores = 0.65 * cosine_scores + 0.35 * quantum_scores
+                # ---- Hybrid scoring with explicit mood safety & alignment ----
+                semantic_scores = 0.65 * cosine_scores + 0.35 * quantum_scores
+                compound_emotions = user_analysis.get("compound_emotions", {})
+                target_mood_groups = _extract_target_mood_groups(text, compound_emotions)
 
                 for idx, book in enumerate(books):
+                    mood_alignment = _score_book_mood_alignment(text, compound_emotions, book)
+                    trope_relevance = _score_book_trope_relevance(target_mood_groups, book)
+                    semantic_component = max(0.0, min(1.0, float(semantic_scores[idx])))
+                    final_score = (
+                        semantic_component * 0.5
+                        + mood_alignment * 0.3
+                        + trope_relevance * 0.2
+                    )
+                    if _is_book_incompatible_with_mood(target_mood_groups, book):
+                        final_score -= 0.25
+
                     recommendations.append({
                         "title": book.get("title"),
                         "author": book.get("author"),
@@ -1349,10 +1650,12 @@ async def recommend(mood: MoodRequest):
                         "tone": book.get("tone"),
                         "pacing": book.get("pacing"),
                         "personality_vector": book.get("personality_vector", []),
-                        "score": float(hybrid_scores[idx]),
-                        "matchScore": float(hybrid_scores[idx]),
+                        "score": float(final_score),
+                        "matchScore": float(final_score),
                         "classical_similarity": float(cosine_scores[idx]),
                         "quantum_similarity": float(quantum_scores[idx]),
+                        "mood_alignment": float(mood_alignment),
+                        "trope_relevance": float(trope_relevance),
                     })
             else:
                 # Embeddings unavailable — zero scores
@@ -1384,6 +1687,21 @@ async def recommend(mood: MoodRequest):
             for idx, book in enumerate(books):
                 book_description = book_descriptions[idx]
                 classical_sim = fallback_recommend_similarity(text, book_description)
+                target_mood_groups = _extract_target_mood_groups(text, user_analysis.get("compound_emotions", {}))
+                mood_alignment = _score_book_mood_alignment(
+                    text,
+                    user_analysis.get("compound_emotions", {}),
+                    book,
+                )
+                trope_relevance = _score_book_trope_relevance(target_mood_groups, book)
+                semantic_component = max(0.0, min(1.0, float(classical_sim)))
+                final_score = (
+                    semantic_component * 0.5
+                    + mood_alignment * 0.3
+                    + trope_relevance * 0.2
+                )
+                if _is_book_incompatible_with_mood(target_mood_groups, book):
+                    final_score -= 0.25
                 recommendations.append({
                     "title": book.get("title"),
                     "author": book.get("author"),
@@ -1398,10 +1716,12 @@ async def recommend(mood: MoodRequest):
                     "tone": book.get("tone"),
                     "pacing": book.get("pacing"),
                     "personality_vector": book.get("personality_vector", []),
-                    "score": float(classical_sim),
-                    "matchScore": float(classical_sim),
+                    "score": float(final_score),
+                    "matchScore": float(final_score),
                     "classical_similarity": float(classical_sim),
                     "quantum_similarity": 0.0,
+                    "mood_alignment": float(mood_alignment),
+                    "trope_relevance": float(trope_relevance),
                 })
 
         # Sort by matchScore descending (strict)
@@ -1418,6 +1738,40 @@ async def recommend(mood: MoodRequest):
 
         # For author queries return all matching books; otherwise top 10
         result_pool = recommendations if is_author_query else recommendations[:10]
+
+        # Safety fallback: if mood intent is sadness/comfort and top results are weak,
+        # return comfort-oriented recommendations instead of emotionally opposite books.
+        detected_targets = _extract_target_mood_groups(text, user_analysis.get("compound_emotions", {}))
+        if not is_author_query and ("sadness" in detected_targets or "comfort" in detected_targets):
+            top_alignment = [float(r.get("mood_alignment", 0.0)) for r in result_pool[:5]]
+            if top_alignment and max(top_alignment) < 0.35:
+                logger.info("Applying safe comfort fallback due to low mood-alignment confidence")
+                comfort_books = _build_safe_comfort_recommendations(list(_get_books_dataset()), limit=10)
+                fallback_pool = []
+                for cb in comfort_books:
+                    fallback_pool.append({
+                        "title": cb.get("title"),
+                        "author": cb.get("author"),
+                        "cover": cb.get("cover"),
+                        "buy_link": cb.get("buy_link"),
+                        "synopsis": cb.get("synopsis"),
+                        "genre": cb.get("genre"),
+                        "type": _safe_book_type(cb),
+                        "emotion_tags": cb.get("emotion_tags", []),
+                        "reading_insights": cb.get("reading_insights"),
+                        "mood": cb.get("mood"),
+                        "tone": cb.get("tone"),
+                        "pacing": cb.get("pacing"),
+                        "personality_vector": cb.get("personality_vector", []),
+                        "score": 0.42,
+                        "matchScore": 0.42,
+                        "classical_similarity": 0.0,
+                        "quantum_similarity": 0.0,
+                        "mood_alignment": _score_book_mood_alignment(text, user_analysis.get("compound_emotions", {}), cb),
+                        "trope_relevance": _score_book_trope_relevance(detected_targets, cb),
+                    })
+                if fallback_pool:
+                    result_pool = fallback_pool
 
         # Enrich recommendations with cover images and explanation
         enriched = []
@@ -1485,17 +1839,21 @@ async def select_book(payload: dict):
 
 
 @app.get("/api/v1/history")
-def get_history(limit: int = 100, username: str | None = None):
+def get_history(request: Request, limit: int = 100, username: str | None = None):
     if db_client is None:
         return {"history": []}
-    return {"history": db_client.get_history(limit, user_identifier=(username or "").strip().lower() or None)}
+    auth_ctx = _resolve_request_user_context(request)
+    effective_user = (username or "").strip().lower() or auth_ctx.get("username")
+    return {"history": db_client.get_history(limit, user_identifier=effective_user)}
 
 
 @app.get("/api/v1/analytics")
-def get_analytics(username: str | None = None):
+def get_analytics(request: Request, username: str | None = None):
     if db_client is None:
         return {"analytics": {}}
-    analytics = db_client.get_analytics(user_identifier=(username or "").strip().lower() or None)
+    auth_ctx = _resolve_request_user_context(request)
+    effective_user = (username or "").strip().lower() or auth_ctx.get("username")
+    analytics = db_client.get_analytics(user_identifier=effective_user)
 
     # Personality summary (attempt AI-generated short paragraph)
     personality = None
@@ -1731,3 +2089,4 @@ else:
         }
 
     logger.info("ℹ️  No frontend/dist found — run 'npm run build' in frontend/ to enable SPA serving")
+
