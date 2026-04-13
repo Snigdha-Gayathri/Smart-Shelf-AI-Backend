@@ -29,6 +29,87 @@ html.dark .app-layout {
   transition: background 0.45s ease, color 0.3s ease;
 }
 
+/* ── Light-mode accessibility and consistency overrides ───────────── */
+html.light,
+html.light body {
+  color: #000000;
+}
+
+html.light :is(
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  p,
+  span,
+  a,
+  label,
+  small,
+  strong,
+  em,
+  li,
+  dt,
+  dd,
+  th,
+  td,
+  caption,
+  legend,
+  figcaption,
+  blockquote,
+  code,
+  pre,
+  button,
+  input,
+  textarea,
+  select,
+  option
+) {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+}
+
+html.light :is(input, textarea)::placeholder {
+  color: #000000 !important;
+  opacity: 1;
+}
+
+/* Remove light-mode tints on glassmorphism surfaces while keeping blur and borders */
+html.light :is(.glass, .glass-strong, .glass-subtle, .glass-hover) {
+  background: transparent !important;
+  background-color: rgba(255, 255, 255, 0) !important;
+  background-image: none !important;
+}
+
+html.light .glass-hover:hover {
+  background: transparent !important;
+  background-color: rgba(255, 255, 255, 0) !important;
+}
+
+html.light [class*="backdrop-blur"][class*="bg-"] {
+  background: transparent !important;
+  background-color: rgba(255, 255, 255, 0) !important;
+  background-image: none !important;
+}
+
+html.light :is([style*="backdrop-filter"], [style*="backdropFilter"]) {
+  background: transparent !important;
+  background-color: rgba(255, 255, 255, 0) !important;
+  background-image: none !important;
+}
+
+/* Light-mode scoped white text + subtle glow for hero narrative sections */
+html.light .intro-light-glow,
+html.light .personality-story-light-glow {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow:
+    0 0 5px rgba(255, 255, 255, 0.6),
+    0 0 10px rgba(255, 255, 255, 0.4),
+    0 0 15px rgba(255, 255, 255, 0.2) !important;
+}
+
 /* ── Light-mode readable gradient text accents ───────────── */
 html.light .app-main-title {
   background: linear-gradient(90deg, #ffffff, #e6f4ff, #b3daff);
@@ -673,6 +754,12 @@ html.dark .auth-new-shell {
   animation: twinkle 4s ease-in-out infinite alternate;
 }
 
+/* Keep decorative particles white in light mode (override global light text color). */
+html.light .auth-sparkle {
+  color: #ffffff !important;
+  text-shadow: 0 0 8px rgba(255, 255, 255, 0.75);
+}
+
 .auth-cursor-snow-layer {
   position: fixed;
   inset: 0;
@@ -686,6 +773,16 @@ html.dark .auth-new-shell {
   text-shadow: 0 0 10px rgba(255, 255, 255, 0.9);
   animation: cursorSnowFloat var(--snow-duration, 1.4s) ease-out forwards;
   transform: translate(-50%, -50%);
+}
+
+html.light .auth-cursor-snowflake {
+  color: #ffffff !important;
+  -webkit-text-fill-color: #ffffff !important;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 16px rgba(255, 255, 255, 0.55);
+}
+
+html.light .auth-sparkle {
+  -webkit-text-fill-color: #ffffff !important;
 }
 
 @keyframes cursorSnowFloat {
@@ -1016,13 +1113,24 @@ html.dark .auth-input-icon-right {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, transform 0.12s ease, box-shadow 0.2s ease, filter 0.2s ease;
   font-family: 'Times New Roman', Times, serif;
   letter-spacing: 0.05em;
 }
 .auth-btn-primary:hover {
   filter: brightness(1.08);
   transform: translateY(-1px);
+}
+.auth-btn-primary:active {
+  transform: scale(0.97);
+}
+.auth-btn-primary:disabled {
+  cursor: not-allowed;
+  opacity: 0.88;
+}
+.auth-btn-primary-loading {
+  background: #1e90ff;
+  box-shadow: 0 0 0 2px rgba(30, 144, 255, 0.22);
 }
 
 /* SHARED GOOGLE BUTTON STYLES */
@@ -1286,8 +1394,8 @@ html.dark .auth-msg-success {
 }
 
 .auth-new-shell[data-theme='dark'] .auth-cursor-snowflake {
-  color: rgba(194, 222, 255, 0.9);
-  text-shadow: 0 0 10px rgba(168, 206, 255, 0.9);
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.9), 0 0 16px rgba(255, 255, 255, 0.55);
 }
 
 .auth-new-shell[data-theme='dark'] .auth-brand-kicker { color: rgba(196, 221, 255, 0.94); }

@@ -109,12 +109,14 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
   const [forgotUsername, setForgotUsername] = useState('')
   const [forgotOtpInput, setForgotOtpInput] = useState('')
   const [forgotOtpToken, setForgotOtpToken] = useState('')
-  const [forgotCurrentPass, setForgotCurrentPass] = useState('')
   const [forgotNewPass, setForgotNewPass] = useState('')
   const [forgotConfirmPass, setForgotConfirmPass] = useState('')
   const [forgotError, setForgotError] = useState('')
   const [forgotInfo, setForgotInfo] = useState('')
   const [forgotDemoOtp, setForgotDemoOtp] = useState('')
+  const [forgotRequestLoading, setForgotRequestLoading] = useState(false)
+  const [forgotVerifyLoading, setForgotVerifyLoading] = useState(false)
+  const [forgotUpdateLoading, setForgotUpdateLoading] = useState(false)
 
   /* Login handler */
   async function handleLogin(e) {
@@ -219,12 +221,14 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
     setForgotStep('otp')
     setForgotOtpInput('')
     setForgotOtpToken('')
-    setForgotCurrentPass('')
     setForgotNewPass('')
     setForgotConfirmPass('')
     setForgotError('')
     setForgotInfo('')
     setForgotDemoOtp('')
+    setForgotRequestLoading(false)
+    setForgotVerifyLoading(false)
+    setForgotUpdateLoading(false)
   }
 
   function openForgotModal() {
@@ -242,6 +246,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
     setForgotInfo('')
     setForgotDemoOtp('')
     if (!forgotUsername.trim()) { setForgotError('Username is required.'); return }
+    setForgotRequestLoading(true)
     try {
       const res = await fetch(`${API_BASE}/auth/request-otp`, {
         method: 'POST',
@@ -251,12 +256,14 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
       const data = await res.json()
       if (data.status === 'ok') {
         setForgotDemoOtp(data.otp || '')
-        setForgotInfo(data.otp ? `Demo OTP: ${data.otp}` : (data.message || 'OTP sent.'))
+        setForgotInfo(data.otp ? `Demo OTP: ${data.otp}` : (data.message || 'OTP generated.'))
       } else {
         setForgotError(data.error || 'Failed to request OTP.')
       }
     } catch {
       setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotRequestLoading(false)
     }
   }
 
@@ -264,6 +271,7 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
     setForgotError('')
     setForgotInfo('')
     if (!forgotOtpInput.trim()) { setForgotError('OTP is required.'); return }
+    setForgotVerifyLoading(true)
     try {
       const res = await fetch(`${API_BASE}/auth/verify-otp`, {
         method: 'POST',
@@ -280,33 +288,40 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
       }
     } catch {
       setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotVerifyLoading(false)
     }
   }
 
   async function forgotSubmitNewPassword() {
     setForgotError('')
     setForgotInfo('')
-    if (!forgotCurrentPass) { setForgotError('Current password is required.'); return }
     if (!isForgotPasswordStrong(forgotNewPass)) {
       setForgotError('Password must be 8–16 characters with letters, numbers, and a special character.')
       return
     }
     if (forgotNewPass !== forgotConfirmPass) { setForgotError('Passwords do not match.'); return }
+    setForgotUpdateLoading(true)
     try {
       const res = await fetch(`${API_BASE}/auth/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: forgotUsername, current_password: forgotCurrentPass, new_password: forgotNewPass, token: forgotOtpToken })
+        body: JSON.stringify({ username: forgotUsername, new_password: forgotNewPass, token: forgotOtpToken })
       })
       const data = await res.json()
       if (data.status === 'ok') {
-        setForgotStep('success')
-        setForgotInfo(data.message || 'Password updated successfully.')
+        setLoginUsername(forgotUsername.trim().toLowerCase())
+        setLoginPassword('')
+        setLoginSuccess('Password updated successfully. Please log in.')
+        setShowForgotModal(false)
+        resetForgotFlow()
       } else {
         setForgotError(data.error || 'Failed to change password.')
       }
     } catch {
       setForgotError('Network error. Please try again.')
+    } finally {
+      setForgotUpdateLoading(false)
     }
   }
 
@@ -432,8 +447,13 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
             </div>
 
             <div className="auth-form-actions">
-              <button type="submit" disabled={loginLoading || !!loginSuccess} className="auth-btn-primary">
-                <span style={{ fontSize: '18px', fontWeight: 'bold' }}>&#8594;</span> Login
+              <button
+                type="submit"
+                disabled={loginLoading || !!loginSuccess}
+                className={`auth-btn-primary ${loginLoading ? 'auth-btn-primary-loading' : ''}`}
+                aria-busy={loginLoading}
+              >
+                {loginLoading ? 'Logging in...' : <><span style={{ fontSize: '18px', fontWeight: 'bold' }}>&#8594;</span> Login</>}
               </button>
               <GoogleAuthButtons enabled={googleAuthEnabled} mode="login" className="auth-btn-google" buttonText="Continue with Google" />
             </div>
@@ -514,8 +534,13 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
             </div>
 
             <div className="auth-form-actions">
-              <button type="submit" disabled={regLoading || !!regSuccess} className="auth-btn-primary">
-                <FiUserPlus size={18} /> &nbsp;Register
+              <button
+                type="submit"
+                disabled={regLoading || !!regSuccess}
+                className={`auth-btn-primary ${regLoading ? 'auth-btn-primary-loading' : ''}`}
+                aria-busy={regLoading}
+              >
+                {regLoading ? 'Registering...' : <><FiUserPlus size={18} /> &nbsp;Register</>}
               </button>
               <GoogleAuthButtons enabled={googleAuthEnabled} mode="register" className="auth-btn-google" buttonText="Continue with Google" />
             </div>
@@ -563,18 +588,14 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
                 {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
                 <div className="auth-forgot-actions">
                   <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
-                  <button type="button" className="auth-forgot-secondary-btn" onClick={forgotRequestOtp}>Generate OTP</button>
-                  <button type="button" className="auth-btn-primary auth-forgot-confirm-btn" onClick={forgotVerifyOtp}>Verify OTP</button>
+                  <button type="button" className="auth-forgot-secondary-btn" onClick={forgotRequestOtp} disabled={forgotRequestLoading || forgotVerifyLoading || forgotUpdateLoading}>{forgotRequestLoading ? 'Generating...' : 'Generate OTP'}</button>
+                  <button type="button" className={`auth-btn-primary auth-forgot-confirm-btn ${forgotVerifyLoading ? 'auth-btn-primary-loading' : ''}`} onClick={forgotVerifyOtp} disabled={forgotVerifyLoading || forgotRequestLoading || forgotUpdateLoading}>{forgotVerifyLoading ? 'Verifying...' : 'Verify OTP'}</button>
                 </div>
               </div>
             )}
 
             {forgotStep === 'password' && (
               <div className="auth-forgot-step">
-                <label className="auth-forgot-label">Current Password</label>
-                <div className="auth-input-wrapper">
-                  <input type="password" value={forgotCurrentPass} onChange={(e) => setForgotCurrentPass(e.target.value)} className="auth-input-new" placeholder="Current password" />
-                </div>
                 <label className="auth-forgot-label">New Password</label>
                 <div className="auth-input-wrapper">
                   <input type="password" value={forgotNewPass} onChange={(e) => setForgotNewPass(e.target.value)} className="auth-input-new" placeholder="New password (8-16 chars)" />
@@ -589,11 +610,11 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
                   <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
                   <button
                     type="button"
-                    className="auth-btn-primary auth-forgot-confirm-btn"
-                    disabled={!forgotCurrentPass || !forgotNewPass || forgotNewPass !== forgotConfirmPass || !isForgotPasswordStrong(forgotNewPass)}
+                    className={`auth-btn-primary auth-forgot-confirm-btn ${forgotUpdateLoading ? 'auth-btn-primary-loading' : ''}`}
+                    disabled={forgotUpdateLoading || !forgotNewPass || forgotNewPass !== forgotConfirmPass || !isForgotPasswordStrong(forgotNewPass)}
                     onClick={forgotSubmitNewPassword}
                   >
-                    Update Password
+                    {forgotUpdateLoading ? 'Updating...' : 'Update Password'}
                   </button>
                 </div>
               </div>

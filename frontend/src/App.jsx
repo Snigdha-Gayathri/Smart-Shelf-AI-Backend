@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import HeaderSection from './components/HeaderSection';
 import HamburgerMenu from './components/HamburgerMenu';
@@ -14,7 +14,6 @@ import QuantumLoader from './components/QuantumLoader';
 import QLexiAssistant from './components/QLexiAssistant';
 import PersonalityStoryScreen from './components/PersonalityStoryScreen';
 import { GenreBarChart, MoodPieChart, TropeHorizontalBarChart } from './components/PersonalityCharts';
-import { userStorage } from './utils/userStorage';
 import IntroSection from './components/IntroSection';
 import EducationalReads from './components/EducationalReads';
 import YourEducation from './components/YourEducation';
@@ -68,46 +67,27 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [auth, setAuth] = useState(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('auth') || 'null');
-      if (stored?.user) return { user: stored.user };
+      if (stored?.user) {
+        return {
+          user: stored.user,
+          token: stored.token || null,
+          authMethod: stored.authMethod || 'local',
+        };
+      }
     } catch { /* ignore parse errors */ }
     return null;
   });
   
-  // Initialize user state with hydration from persistent storage
-  const [currentlyReading, setCurrentlyReading] = useState(() => 
-    auth?.user?.id ? userStorage.load(auth.user.id, 'currentlyReading', []) : []
-  );
-  const [educationalBooks, setEducationalBooks] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'educationalBooks', []) : []
-  );
-  const [previousReads, setPreviousReads] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'previousReads', []) : []
-  );
-  const [userFeedback, setUserFeedback] = useState(() => {
-    if (!auth?.user?.id) {
-      return {
-        ...DEFAULT_USER_FEEDBACK
-      };
-    }
-    return userStorage.load(auth.user.id, 'userFeedback', DEFAULT_USER_FEEDBACK);
-  });
-  const [personalityProfile, setPersonalityProfile] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'personalityProfile', null) : null
-  );
-  const [annualWrapped, setAnnualWrapped] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'annualWrapped', null) : null
-  );
-  const [reviews, setReviews] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'reviews', []) : []
-  );
-  const [reviewInsights, setReviewInsights] = useState(() =>
-    auth?.user?.id
-      ? userStorage.load(auth.user.id, 'reviewInsights', DEFAULT_REVIEW_INSIGHTS)
-      : DEFAULT_REVIEW_INSIGHTS
-  );
-  const [userPreferenceModel, setUserPreferenceModel] = useState(() =>
-    auth?.user?.id ? userStorage.load(auth.user.id, 'userPreferenceModel', {}) : {}
-  );
+  // User-scoped state now hydrates from backend /auth/user-state for cross-device sync.
+  const [currentlyReading, setCurrentlyReading] = useState([]);
+  const [educationalBooks, setEducationalBooks] = useState([]);
+  const [previousReads, setPreviousReads] = useState([]);
+  const [userFeedback, setUserFeedback] = useState(DEFAULT_USER_FEEDBACK);
+  const [personalityProfile, setPersonalityProfile] = useState(null);
+  const [annualWrapped, setAnnualWrapped] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [reviewInsights, setReviewInsights] = useState(DEFAULT_REVIEW_INSIGHTS);
+  const [userPreferenceModel, setUserPreferenceModel] = useState({});
   
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -115,6 +95,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('introduction');
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const hasHydratedRemoteStateRef = useRef(false);
+  const stateSyncTimeoutRef = useRef(null);
   const buildAuthHeaders = () => {
     const token = auth?.token;
     const userId = auth?.user?.id;
@@ -139,6 +121,97 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setRecommendations([]);
     setError('');
   };
+
+  const serializeUserFeedback = (feedback) => ({
+    likedGenres: Object.fromEntries(feedback?.likedGenres || []),
+    dislikedGenres: Object.fromEntries(feedback?.dislikedGenres || []),
+    likedTags: Object.fromEntries(feedback?.likedTags || []),
+    dislikedTags: Object.fromEntries(feedback?.dislikedTags || []),
+  });
+
+  const deserializeUserFeedback = (raw) => ({
+    likedGenres: new Map(Object.entries(raw?.likedGenres || {})),
+    dislikedGenres: new Map(Object.entries(raw?.dislikedGenres || {})),
+    likedTags: new Map(Object.entries(raw?.likedTags || {})),
+    dislikedTags: new Map(Object.entries(raw?.dislikedTags || {})),
+  });
+
+  const buildRemoteUserStatePayload = () => ({
+    currentlyReading,
+    educationalBooks,
+    previousReads,
+    userFeedback: serializeUserFeedback(userFeedback),
+    personalityProfile,
+    annualWrapped,
+    reviews,
+    reviewInsights,
+    userPreferenceModel,
+    recommendations,
+    lastSyncedAt: new Date().toISOString(),
+  });
+
+  const applyRemoteUserState = (state) => {
+    if (!state || typeof state !== 'object') return;
+    setCurrentlyReading(Array.isArray(state.currentlyReading) ? state.currentlyReading : []);
+    setEducationalBooks(Array.isArray(state.educationalBooks) ? state.educationalBooks : []);
+    setPreviousReads(Array.isArray(state.previousReads) ? state.previousReads : []);
+    setUserFeedback(deserializeUserFeedback(state.userFeedback || {}));
+    setPersonalityProfile(state.personalityProfile || null);
+    setAnnualWrapped(state.annualWrapped || null);
+    setReviews(Array.isArray(state.reviews) ? state.reviews : []);
+    setReviewInsights(state.reviewInsights || DEFAULT_REVIEW_INSIGHTS);
+    setUserPreferenceModel(state.userPreferenceModel || {});
+    setRecommendations(Array.isArray(state.recommendations) ? state.recommendations : []);
+  };
+
+  const reviveLegacySerialized = (value) => {
+    if (Array.isArray(value)) return value.map(reviveLegacySerialized)
+    if (value && typeof value === 'object') {
+      if (value.__type === 'Map' && Array.isArray(value.value)) {
+        return Object.fromEntries(value.value)
+      }
+      return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, reviveLegacySerialized(v)]))
+    }
+    return value
+  }
+
+  const loadLegacyLocalState = (userId) => {
+    if (!userId) return null
+    try {
+      const pick = (dataType, fallback) => {
+        const raw = localStorage.getItem(`user_${userId}_${dataType}`)
+        if (!raw) return fallback
+        const parsed = reviveLegacySerialized(JSON.parse(raw))
+        return parsed ?? fallback
+      }
+
+      const state = {
+        currentlyReading: pick('currentlyReading', []),
+        educationalBooks: pick('educationalBooks', []),
+        previousReads: pick('previousReads', []),
+        userFeedback: pick('userFeedback', serializeUserFeedback(DEFAULT_USER_FEEDBACK)),
+        personalityProfile: pick('personalityProfile', null),
+        annualWrapped: pick('annualWrapped', null),
+        reviews: pick('reviews', []),
+        reviewInsights: pick('reviewInsights', DEFAULT_REVIEW_INSIGHTS),
+        userPreferenceModel: pick('userPreferenceModel', {}),
+        recommendations: [],
+      }
+
+      const hasAnyData = [
+        state.currentlyReading.length,
+        state.educationalBooks.length,
+        state.previousReads.length,
+        state.reviews.length,
+        state.personalityProfile ? 1 : 0,
+        state.annualWrapped ? 1 : 0,
+      ].some(Boolean)
+
+      return hasAnyData ? state : null
+    } catch {
+      return null
+    }
+  }
 
   useEffect(() => {
     if (window.location.pathname === '/author-dashboard') {
@@ -231,56 +304,111 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     }
   }, [clerkEnabled, isClerkLoaded, isSignedIn, clerkUser, auth]);
 
-  // Persist currentlyReading to storage whenever it changes
+  // Hydrate user-scoped data from backend after login so data is shared across devices.
   useEffect(() => {
-    if (auth?.user?.id) {
-      userStorage.save(auth.user.id, 'currentlyReading', currentlyReading);
+    if (!auth?.user?.id) {
+      hasHydratedRemoteStateRef.current = false
+      return
     }
-  }, [currentlyReading, auth?.user?.id]);
 
-  // Persist educationalBooks to storage whenever it changes
-  useEffect(() => {
-    if (auth?.user?.id) {
-      userStorage.save(auth.user.id, 'educationalBooks', educationalBooks);
+    let cancelled = false
+    async function hydrateFromBackend() {
+      try {
+        const query = new URLSearchParams({
+          user_id: String(auth.user.id),
+          username: String(auth.user.username || auth.user.email || '').toLowerCase(),
+        })
+        const res = await fetch(`${API_BASE}/auth/user-state?${query.toString()}`, {
+          headers: {
+            ...buildAuthHeaders(),
+          },
+        })
+        if (!res.ok) {
+          if (!cancelled) hasHydratedRemoteStateRef.current = true
+          return
+        }
+        const data = await res.json()
+        if (cancelled) return
+        if (data?.status === 'ok' && data?.state && typeof data.state === 'object' && Object.keys(data.state).length > 0) {
+          applyRemoteUserState(data.state)
+        } else {
+          const legacy = loadLegacyLocalState(auth.user.id)
+          if (legacy) {
+            applyRemoteUserState(legacy)
+            await fetch(`${API_BASE}/auth/user-state`, {
+              method: 'PUT',
+              headers: {
+                'Content-Type': 'application/json',
+                ...buildAuthHeaders(),
+              },
+              body: JSON.stringify({
+                user_id: auth.user.id,
+                username: auth.user.username || auth.user.email || '',
+                state: legacy,
+              }),
+            })
+          }
+        }
+      } catch {
+        // keep defaults if backend state cannot be loaded
+      } finally {
+        if (!cancelled) {
+          hasHydratedRemoteStateRef.current = true
+        }
+      }
     }
-  }, [educationalBooks, auth?.user?.id]);
 
-  // Persist previousReads to storage whenever it changes
-  useEffect(() => {
-    if (auth?.user?.id) {
-      userStorage.save(auth.user.id, 'previousReads', previousReads);
+    hydrateFromBackend()
+    return () => {
+      cancelled = true
     }
-  }, [previousReads, auth?.user?.id]);
+  }, [auth?.user?.id])
 
-  // Persist userFeedback to storage whenever it changes
+  // Persist user-scoped state to backend (debounced) for cross-device continuity.
   useEffect(() => {
-    if (auth?.user?.id) {
-      userStorage.save(auth.user.id, 'userFeedback', userFeedback);
-    }
-  }, [userFeedback, auth?.user?.id]);
+    if (!auth?.user?.id || !hasHydratedRemoteStateRef.current) return
 
-  // Persist personalityProfile to storage whenever it changes
-  useEffect(() => {
-    if (auth?.user?.id && personalityProfile) {
-      userStorage.save(auth.user.id, 'personalityProfile', personalityProfile);
+    if (stateSyncTimeoutRef.current) {
+      window.clearTimeout(stateSyncTimeoutRef.current)
     }
-  }, [personalityProfile, auth?.user?.id]);
 
-  // Persist annualWrapped to storage whenever it changes
-  useEffect(() => {
-    if (auth?.user?.id && annualWrapped) {
-      userStorage.save(auth.user.id, 'annualWrapped', annualWrapped);
-    }
-  }, [annualWrapped, auth?.user?.id]);
+    stateSyncTimeoutRef.current = window.setTimeout(async () => {
+      try {
+        await fetch(`${API_BASE}/auth/user-state`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...buildAuthHeaders(),
+          },
+          body: JSON.stringify({
+            user_id: auth.user.id,
+            username: auth.user.username || auth.user.email || '',
+            state: buildRemoteUserStatePayload(),
+          }),
+        })
+      } catch {
+        // non-blocking: UI continues even if persistence fails
+      }
+    }, 500)
 
-  // Persist reviews + review intelligence to storage
-  useEffect(() => {
-    if (auth?.user?.id) {
-      userStorage.save(auth.user.id, 'reviews', reviews)
-      userStorage.save(auth.user.id, 'reviewInsights', reviewInsights)
-      userStorage.save(auth.user.id, 'userPreferenceModel', userPreferenceModel)
+    return () => {
+      if (stateSyncTimeoutRef.current) {
+        window.clearTimeout(stateSyncTimeoutRef.current)
+      }
     }
-  }, [reviews, reviewInsights, userPreferenceModel, auth?.user?.id])
+  }, [
+    auth?.user?.id,
+    currentlyReading,
+    educationalBooks,
+    previousReads,
+    userFeedback,
+    personalityProfile,
+    annualWrapped,
+    reviews,
+    reviewInsights,
+    userPreferenceModel,
+    recommendations,
+  ])
 
   // Recompute review intelligence model whenever reviews change
   useEffect(() => {
@@ -353,6 +481,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   function handleAuthSuccess(a){
     // Clear prior in-memory session state before hydrating this user.
     resetUserScopedState();
+    hasHydratedRemoteStateRef.current = false;
     setAuth(a);
     if (a?.user) {
       localStorage.setItem(
@@ -364,19 +493,10 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         })
       );
     }
-    // Load persisted user data from storage after successful login
+    // Hydration now happens via backend /auth/user-state effect.
     if (a?.user?.id) {
       const persistedSettings = loadUserSettings(a.user.id)
       setUserSettings(persistedSettings)
-      setCurrentlyReading(userStorage.load(a.user.id, 'currentlyReading', []));
-      setEducationalBooks(userStorage.load(a.user.id, 'educationalBooks', []));
-      setPreviousReads(userStorage.load(a.user.id, 'previousReads', []));
-      setUserFeedback(userStorage.load(a.user.id, 'userFeedback', DEFAULT_USER_FEEDBACK));
-      setPersonalityProfile(userStorage.load(a.user.id, 'personalityProfile', null));
-      setAnnualWrapped(userStorage.load(a.user.id, 'annualWrapped', null));
-      setReviews(userStorage.load(a.user.id, 'reviews', []));
-      setReviewInsights(userStorage.load(a.user.id, 'reviewInsights', DEFAULT_REVIEW_INSIGHTS));
-      setUserPreferenceModel(userStorage.load(a.user.id, 'userPreferenceModel', {}));
     }
   }
 
@@ -385,6 +505,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setIsLoggingOut(true);
     const finish = () => {
       localStorage.removeItem('auth');
+      hasHydratedRemoteStateRef.current = false;
       resetUserScopedState();
       setAuth(null);
       setUserSettings(loadUserSettings('guest'));
@@ -421,8 +542,6 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       });
       
       if (res.ok) {
-        // Explicitly delete all persisted user data from storage before logout
-        userStorage.deleteUser(auth.user.id);
         handleLogout();
         alert('Your account has been deleted successfully.');
       } else {
@@ -1215,7 +1334,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       <>
         <ThemeToggle theme={theme} setTheme={handleQuickThemeToggle} />
         <CursorParticleCanvas theme={theme} />
-        <SpaceBackground active={theme === 'dark'} />
+        <SpaceBackground active theme={theme} />
         <div className="w-full h-screen overflow-hidden">
           <Auth onSuccess={handleAuthSuccess} googleAuthEnabled={clerkEnabled && isClerkLoaded} theme={theme} />
         </div>
@@ -1227,7 +1346,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     <>
       <ThemeToggle theme={theme} setTheme={handleQuickThemeToggle} />
       <CursorParticleCanvas theme={theme} />
-      <SpaceBackground active={theme === 'dark'} />
+      <SpaceBackground active theme={theme} />
     <div 
       className={`app-layout w-full h-screen overflow-hidden font-sans transition-all duration-300 ${theme === 'dark' ? 'text-white' : 'text-slate-800'} ${isLoggingOut ? 'opacity-0' : 'opacity-100'}`}
     >
@@ -1248,7 +1367,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
         {/* Introduction Section - Full-screen dedicated intro view */}
         {auth && activeSection === 'introduction' && (
           <div className="mt-12">
-            <IntroSection />
+            <IntroSection theme={theme} />
           </div>
         )}
         
@@ -1378,7 +1497,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
 
         {/* Your Personality Story Section */}
         {auth && activeSection === 'personality_story' && (
-          <PersonalityStoryScreen previousReads={previousReads} />
+          <PersonalityStoryScreen previousReads={previousReads} theme={theme} />
         )}
         
         {/* Annual Wrapped Section */}

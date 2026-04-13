@@ -10,7 +10,7 @@ import { useEffect, useRef } from 'react'
 const NUM_STARS = 180
 const NUM_DISTANT_STARS = 56
 
-export default function SpaceBackground({ active }) {
+export default function SpaceBackground({ active = true, theme = 'dark' }) {
   const canvasRef = useRef(null)
 
   useEffect(() => {
@@ -21,6 +21,7 @@ export default function SpaceBackground({ active }) {
     let time = 0
     let shootingCooldown = randomShootingDelay()
     const shootingStars = []
+    const isDark = theme === 'dark'
 
     // Generate stable star positions once
     const stars = Array.from({ length: NUM_STARS }).map(() => ({
@@ -143,36 +144,38 @@ export default function SpaceBackground({ active }) {
 
       time++
 
-      // ── Subtle planets ───────────────────────────────────
-      planets.forEach((planet) => {
-        const px = planet.xRatio * canvas.width
-        const py = planet.yRatio * canvas.height
-        const r = planet.radius
-        const grad = ctx.createRadialGradient(px - r * 0.35, py - r * 0.4, r * 0.2, px, py, r)
-        grad.addColorStop(0, planet.colorA)
-        grad.addColorStop(1, planet.colorB)
+      if (isDark) {
+        // ── Subtle planets ───────────────────────────────────
+        planets.forEach((planet) => {
+          const px = planet.xRatio * canvas.width
+          const py = planet.yRatio * canvas.height
+          const r = planet.radius
+          const grad = ctx.createRadialGradient(px - r * 0.35, py - r * 0.4, r * 0.2, px, py, r)
+          grad.addColorStop(0, planet.colorA)
+          grad.addColorStop(1, planet.colorB)
 
-        ctx.save()
-        ctx.fillStyle = grad
-        ctx.beginPath()
-        ctx.arc(px, py, r, 0, Math.PI * 2)
-        ctx.fill()
-        ctx.shadowColor = 'rgba(180, 210, 255, 0.18)'
-        ctx.shadowBlur = r * 0.6
-        ctx.globalAlpha = planet.glow
-        ctx.strokeStyle = 'rgba(214, 232, 255, 0.4)'
-        ctx.lineWidth = 1
-        ctx.beginPath()
-        ctx.arc(px, py, r * 1.05, 0.2, Math.PI - 0.4)
-        ctx.stroke()
-        ctx.restore()
-      })
+          ctx.save()
+          ctx.fillStyle = grad
+          ctx.beginPath()
+          ctx.arc(px, py, r, 0, Math.PI * 2)
+          ctx.fill()
+          ctx.shadowColor = 'rgba(180, 210, 255, 0.18)'
+          ctx.shadowBlur = r * 0.6
+          ctx.globalAlpha = planet.glow
+          ctx.strokeStyle = 'rgba(214, 232, 255, 0.4)'
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.arc(px, py, r * 1.05, 0.2, Math.PI - 0.4)
+          ctx.stroke()
+          ctx.restore()
+        })
+      }
 
       // ── Distant star layer ───────────────────────────────
       distantStars.forEach((s) => {
         ctx.save()
-        ctx.globalAlpha = s.alpha
-        ctx.fillStyle = '#dbeafe'
+        ctx.globalAlpha = isDark ? s.alpha : Math.min(0.24, s.alpha * 0.8)
+        ctx.fillStyle = '#ffffff'
         ctx.beginPath()
         ctx.arc(s.xRatio * canvas.width, s.yRatio * canvas.height, s.radius, 0, Math.PI * 2)
         ctx.fill()
@@ -181,9 +184,13 @@ export default function SpaceBackground({ active }) {
 
       // ── Twinkling stars ──────────────────────────────────
       stars.forEach((s) => {
-        const twinkle = 0.65 + 0.35 * Math.sin(time * s.speed * 60 + s.phase)
+        const twinkle = isDark
+          ? 0.65 + 0.35 * Math.sin(time * s.speed * 60 + s.phase)
+          : 0.75 + 0.25 * Math.sin(time * s.speed * 48 + s.phase)
         ctx.save()
-        ctx.globalAlpha = s.baseAlpha * twinkle
+        ctx.globalAlpha = isDark
+          ? s.baseAlpha * twinkle
+          : Math.min(0.5, s.baseAlpha * 0.85 * twinkle)
         ctx.fillStyle = '#ffffff'
         ctx.beginPath()
         ctx.arc(
@@ -197,50 +204,52 @@ export default function SpaceBackground({ active }) {
         ctx.restore()
       })
 
-      // ── Subtle drifting spaceship silhouettes ────────────
-      ships.forEach((ship) => {
-        const drift = Math.sin(time * ship.driftSpeed * 60) * 20 * ship.dir
-        const shipX = (ship.xRatio * canvas.width) + (ship.driftAxis === 'x' ? drift : 0)
-        const shipY = (ship.yRatio * canvas.height) + (ship.driftAxis === 'y' ? drift : 0)
-        drawShip(shipX, shipY, ship.scale, ship.opacity)
-      })
+      if (isDark) {
+        // ── Subtle drifting spaceship silhouettes ────────────
+        ships.forEach((ship) => {
+          const drift = Math.sin(time * ship.driftSpeed * 60) * 20 * ship.dir
+          const shipX = (ship.xRatio * canvas.width) + (ship.driftAxis === 'x' ? drift : 0)
+          const shipY = (ship.yRatio * canvas.height) + (ship.driftAxis === 'y' ? drift : 0)
+          drawShip(shipX, shipY, ship.scale, ship.opacity)
+        })
 
-      // ── Shooting stars ───────────────────────────────────
-      shootingCooldown--
-      if (shootingCooldown <= 0) {
-        spawnShootingStar()
-        shootingCooldown = randomShootingDelay()
-      }
-
-      for (let i = shootingStars.length - 1; i >= 0; i--) {
-        const ss = shootingStars[i]
-        ss.x += ss.vx
-        ss.y += ss.vy
-        ss.alpha -= ss.decay
-
-        if (ss.alpha <= 0) {
-          shootingStars.splice(i, 1)
-          continue
+        // ── Shooting stars ───────────────────────────────────
+        shootingCooldown--
+        if (shootingCooldown <= 0) {
+          spawnShootingStar()
+          shootingCooldown = randomShootingDelay()
         }
 
-        const mag = Math.hypot(ss.vx, ss.vy)
-        const tailX = ss.x - (ss.vx / mag) * ss.length
-        const tailY = ss.y - (ss.vy / mag) * ss.length
+        for (let i = shootingStars.length - 1; i >= 0; i--) {
+          const ss = shootingStars[i]
+          ss.x += ss.vx
+          ss.y += ss.vy
+          ss.alpha -= ss.decay
 
-        const grad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y)
-        grad.addColorStop(0, 'rgba(255,255,255,0)')
-        grad.addColorStop(0.6, `rgba(255,255,255,${ss.alpha * 0.4})`)
-        grad.addColorStop(1, `rgba(255,255,255,${ss.alpha})`)
+          if (ss.alpha <= 0) {
+            shootingStars.splice(i, 1)
+            continue
+          }
 
-        ctx.save()
-        ctx.lineWidth = 1.5
-        ctx.strokeStyle = grad
-        ctx.globalAlpha = ss.alpha
-        ctx.beginPath()
-        ctx.moveTo(tailX, tailY)
-        ctx.lineTo(ss.x, ss.y)
-        ctx.stroke()
-        ctx.restore()
+          const mag = Math.hypot(ss.vx, ss.vy)
+          const tailX = ss.x - (ss.vx / mag) * ss.length
+          const tailY = ss.y - (ss.vy / mag) * ss.length
+
+          const grad = ctx.createLinearGradient(tailX, tailY, ss.x, ss.y)
+          grad.addColorStop(0, 'rgba(255,255,255,0)')
+          grad.addColorStop(0.6, `rgba(255,255,255,${ss.alpha * 0.4})`)
+          grad.addColorStop(1, `rgba(255,255,255,${ss.alpha})`)
+
+          ctx.save()
+          ctx.lineWidth = 1.5
+          ctx.strokeStyle = grad
+          ctx.globalAlpha = ss.alpha
+          ctx.beginPath()
+          ctx.moveTo(tailX, tailY)
+          ctx.lineTo(ss.x, ss.y)
+          ctx.stroke()
+          ctx.restore()
+        }
       }
 
       rafId = requestAnimationFrame(draw)
@@ -252,7 +261,7 @@ export default function SpaceBackground({ active }) {
       window.removeEventListener('resize', resize)
       cancelAnimationFrame(rafId)
     }
-  }, [active])
+  }, [active, theme])
 
   return (
     <canvas
@@ -266,7 +275,7 @@ export default function SpaceBackground({ active }) {
         height: '100%',
         pointerEvents: 'none',
         zIndex: 0,
-        opacity: active ? 1 : 0,
+        opacity: active ? (theme === 'dark' ? 1 : 0.85) : 0,
         transition: 'opacity 0.45s ease',
       }}
     />

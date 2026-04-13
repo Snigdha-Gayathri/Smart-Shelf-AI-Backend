@@ -10,7 +10,7 @@ const API_BASE = getApiBase()
 
 
 
-export default function IntroSection() {
+export default function IntroSection({ theme = 'light' }) {
   const [freeBooks, setFreeBooks] = useState([])
 
   useEffect(() => {
@@ -78,7 +78,7 @@ export default function IntroSection() {
         className="relative z-10 w-full max-w-[1600px] mx-auto px-3 sm:px-6 md:px-8"
       >
         <div className="flex flex-col py-4 sm:py-8 md:py-10">
-          <IntroContent freeBooks={freeBooks} />
+          <IntroContent freeBooks={freeBooks} theme={theme} />
         </div>
       </div>
     </section>
@@ -94,13 +94,15 @@ function resolveDownloadUrl(downloadUrl) {
 /* ═══════════════════════════════════════════════════════════
    Extracted content component — shared by mobile & desktop
    ═══════════════════════════════════════════════════════════ */
-function IntroContent({ freeBooks }) {
+function IntroContent({ freeBooks, theme }) {
+  const isLight = theme === 'light'
+
   return (
     <>
 
           {/* Subtitle */}
           <motion.p
-            className="text-sm sm:text-lg md:text-xl text-blue-100 drop-shadow-lg text-center mb-4 sm:mb-8"
+            className={`text-sm sm:text-lg md:text-xl text-center mb-4 sm:mb-8 ${isLight ? 'intro-light-glow' : 'text-blue-100 drop-shadow-lg'}`}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.3 }}
@@ -126,7 +128,7 @@ function IntroContent({ freeBooks }) {
               }}
             >
 
-              <p className="whitespace-pre-line text-white/95 leading-relaxed font-medium drop-shadow-md">
+              <p className={`whitespace-pre-line leading-relaxed font-medium ${isLight ? 'intro-light-glow' : 'text-white/95 drop-shadow-md'}`}>
 {`Hi! I'm Q Lexi 🤍
 I'm the little brain behind SmartShelf, and my job is to understand what you feel like reading — not just what you usually read.
 
@@ -159,7 +161,7 @@ they match your mood, your mindset, and your heart 💫`}
                 boxShadow: GLOW_SOFT,
               }}
             >
-              <p className="text-white/95 leading-relaxed font-medium drop-shadow-md">
+              <p className={`leading-relaxed font-medium ${isLight ? 'intro-light-glow' : 'text-white/95 drop-shadow-md'}`}>
                 Before you begin exploring, SmartShelf has a small gift for you.{' '}
                 We've selected five books that you can download completely free — no limits, no conditions.{' '}
                 Save them to your device and read them anytime, anywhere.{' '}
@@ -193,8 +195,8 @@ they match your mood, your mindset, and your heart 💫`}
                         e.currentTarget.style.display = 'none'
                         e.currentTarget.parentElement.classList.add('flex', 'flex-col', 'items-center', 'justify-center')
                         e.currentTarget.parentElement.insertAdjacentHTML('beforeend',
-                          `<span class="text-[10px] sm:text-xs font-bold text-white/90 text-center px-2 leading-tight">${book.title}</span>` +
-                          (book.author ? `<span class="text-[8px] sm:text-[10px] text-white/50 mt-1 text-center px-2">${book.author}</span>` : '')
+                          `<span class="intro-light-glow text-[10px] sm:text-xs font-bold text-center px-2 leading-tight">${book.title}</span>` +
+                          (book.author ? `<span class="intro-light-glow text-[8px] sm:text-[10px] mt-1 text-center px-2">${book.author}</span>` : '')
                         )
                       }}
                     />
@@ -204,7 +206,7 @@ they match your mood, your mindset, and your heart 💫`}
                   <a
                     href={resolveDownloadUrl(book.download_url)}
                     download
-                    className="w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold text-white rounded-lg transition-all duration-300 hover:scale-105 no-underline block"
+                    className={`w-full text-center px-3 py-1.5 text-[11px] sm:text-xs font-semibold rounded-lg transition-all duration-300 hover:scale-105 no-underline block ${isLight ? 'intro-light-glow' : 'text-white'}`}
                     style={{
                       border: `1.5px solid ${BLUE}`,
                       background: 'rgba(30,144,255,0.12)',

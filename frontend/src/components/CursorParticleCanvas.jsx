@@ -21,7 +21,9 @@ export default function CursorParticleCanvas({ theme }) {
     const particles = []
     let frame = 0
     let rafId
+    let lastSpawnTs = 0
     const isDark = theme === 'dark'
+    const maxParticles = isDark ? 40 : 32
 
     function drawStar(cx, cy, spikes, outerRadius, innerRadius) {
       let rot = Math.PI / 2 * 3
@@ -39,6 +41,20 @@ export default function CursorParticleCanvas({ theme }) {
       ctx.closePath()
     }
 
+    function drawSnowflake(cx, cy, size) {
+      const arm = size * 1.2
+      ctx.beginPath()
+      ctx.moveTo(cx - arm, cy)
+      ctx.lineTo(cx + arm, cy)
+      ctx.moveTo(cx, cy - arm)
+      ctx.lineTo(cx, cy + arm)
+      ctx.moveTo(cx - arm * 0.72, cy - arm * 0.72)
+      ctx.lineTo(cx + arm * 0.72, cy + arm * 0.72)
+      ctx.moveTo(cx + arm * 0.72, cy - arm * 0.72)
+      ctx.lineTo(cx - arm * 0.72, cy + arm * 0.72)
+      ctx.stroke()
+    }
+
     function resize() {
       canvas.width = window.innerWidth
       canvas.height = window.innerHeight
@@ -47,8 +63,8 @@ export default function CursorParticleCanvas({ theme }) {
     window.addEventListener('resize', resize)
 
     function spawnParticle(x, y) {
-      // Keep at most 40 particles at once
-      if (particles.length >= 40) particles.splice(0, 1)
+      // Keep a small particle cap for smooth performance.
+      if (particles.length >= maxParticles) particles.splice(0, 1)
       const brightness = 0.55 + Math.random() * 0.45
       particles.push({
         x,
@@ -67,6 +83,9 @@ export default function CursorParticleCanvas({ theme }) {
     }
 
     function onMouseMove(e) {
+      const now = performance.now()
+      if (!isDark && now - lastSpawnTs < 20) return
+      lastSpawnTs = now
       spawnParticle(e.clientX, e.clientY)
     }
     window.addEventListener('mousemove', onMouseMove)
@@ -90,23 +109,23 @@ export default function CursorParticleCanvas({ theme }) {
         ctx.globalAlpha = Math.max(0, p.alpha)
 
         if (isDark) {
-          // Twinkling pale-blue star
+          // Twinkling white star
           const pulse = 0.45 + ((Math.sin(frame * p.twinkleSpeed + p.phase) + 1) / 2) * 0.55
           const starAlpha = Math.max(0, p.alpha * pulse)
           ctx.globalAlpha = starAlpha
-          ctx.shadowColor = `rgba(170, 220, 255, ${0.75 * p.brightness})`
+          ctx.shadowColor = `rgba(255, 255, 255, ${0.78 * p.brightness})`
           ctx.shadowBlur = 8 + p.size * 2.4
-          ctx.fillStyle = `rgba(225, 245, 255, ${0.72 + p.brightness * 0.28})`
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.75 + p.brightness * 0.25})`
           drawStar(p.x, p.y, 5, p.size * (1.2 + p.brightness * 0.25), p.size * 0.48)
           ctx.fill()
         } else {
-          // White snowflake character
-          ctx.shadowColor = 'rgba(255, 255, 255, 0.7)'
+          // White vector snowflake (avoids black glyph fallback on some fonts/devices)
+          ctx.shadowColor = 'rgba(255, 255, 255, 0.72)'
           ctx.shadowBlur = 5
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.95)'
-          ctx.font = `${p.size * 2.2}px serif`
-          ctx.textBaseline = 'middle'
-          ctx.fillText('❄', p.x - p.size, p.y)
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.96)'
+          ctx.lineWidth = 1.4
+          ctx.lineCap = 'round'
+          drawSnowflake(p.x, p.y, p.size)
         }
 
         ctx.restore()

@@ -1,5 +1,6 @@
 import sqlite3
 import os
+import json
 from datetime import datetime
 from typing import List, Dict
 
@@ -8,6 +9,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), '..', 'previous_books.db')
 
 def _get_conn():
     conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -50,6 +52,16 @@ def init_db():
             username TEXT PRIMARY KEY,
             deleted_at TEXT NOT NULL,
             reason TEXT
+        )
+        """
+    )
+    cur.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_app_state (
+            user_id INTEGER PRIMARY KEY,
+            state_json TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         """
     )
@@ -250,7 +262,12 @@ def delete_user(email: str):
             (username, datetime.utcnow().isoformat(), "account_deleted"),
         )
 
-    # Delete user record
+    # Delete app state and user record
+    cur.execute("SELECT id FROM users WHERE email = ?", (normalized_email,))
+    user_row = cur.fetchone()
+    if user_row:
+        cur.execute("DELETE FROM user_app_state WHERE user_id = ?", (int(user_row[0]),))
+
     cur.execute("DELETE FROM users WHERE email = ?", (normalized_email,))
 
     # Delete reading records linked to this user by username/email identifier.
@@ -268,15 +285,19 @@ def delete_user_by_username(username: str):
     cur = conn.cursor()
     normalized_username = (username or "").strip().lower()
 
-    # Fetch email for cleanup before deleting.
-    cur.execute("SELECT email FROM users WHERE username = ?", (normalized_username,))
+    # Fetch email/id for cleanup before deleting.
+    cur.execute("SELECT id, email FROM users WHERE username = ?", (normalized_username,))
     row = cur.fetchone()
-    email = (row[0] or "").strip().lower() if row else ""
+    user_id = int(row[0]) if row and row[0] is not None else None
+    email = (row[1] or "").strip().lower() if row else ""
 
     cur.execute(
         "INSERT OR REPLACE INTO deleted_usernames (username, deleted_at, reason) VALUES (?, ?, ?)",
         (normalized_username, datetime.utcnow().isoformat(), "account_deleted"),
     )
+
+    if user_id is not None:
+        cur.execute("DELETE FROM user_app_state WHERE user_id = ?", (user_id,))
 
     cur.execute("DELETE FROM users WHERE username = ?", (normalized_username,))
     cur.execute("DELETE FROM previous_books_read WHERE user_identifier = ?", (normalized_username,))
@@ -298,6 +319,43 @@ def get_deleted_username(username: str) -> Dict | None:
     row = cur.fetchone()
     conn.close()
     return dict(row) if row else None
+
+
+def get_user_app_state(user_id: int) -> Dict | None:
+    """Return persisted app state for a user, or None when not present."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    cur.execute("SELECT state_json FROM user_app_state WHERE user_id = ?", (int(user_id),))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    try:
+        return json.loads(row[0] or "{}")
+    except Exception:
+        return {}
+
+
+def upsert_user_app_state(user_id: int, state: Dict) -> bool:
+    """Insert or replace persisted app state for a user."""
+    init_db()
+    conn = _get_conn()
+    cur = conn.cursor()
+    ts = datetime.utcnow().isoformat()
+    payload = json.dumps(state or {}, ensure_ascii=False)
+    cur.execute(
+        """
+        INSERT INTO user_app_state (user_id, state_json, updated_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(user_id) DO UPDATE SET state_json = excluded.state_json, updated_at = excluded.updated_at
+        """,
+        (int(user_id), payload, ts),
+    )
+    conn.commit()
+    updated = cur.rowcount > 0
+    conn.close()
+    return updated
 
 
 def add_oauth_user(email: str, name: str, profile_picture: str, oauth_provider: str, oauth_provider_id: str, created_at: str | None = None) -> Dict | None:

@@ -158,6 +158,16 @@ _AUTHOR_WEBSITE_MAP: Dict[str, str] = {}
 # In-memory stores with short-lived entries; replace with real SMS provider later.
 otp_store: dict[str, dict] = {}
 verified_sessions: dict[str, dict] = {}
+OTP_TTL_SECONDS = 300
+VERIFIED_SESSION_TTL_SECONDS = 600
+
+
+def _hash_otp(username: str, otp: str) -> str:
+    """Hash OTP with username + secret so raw OTP is never stored."""
+    import hashlib
+    secret = os.getenv("OTP_SECRET", os.getenv("JWT_SECRET", "smartshelf-otp-secret"))
+    payload = f"{username}:{otp}:{secret}".encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _make_placeholder_cover_dataurl(title: str, author: str = '', width: int = 400, height: int = 600) -> str:
@@ -219,9 +229,15 @@ class VerifyOtpPayload(BaseModel):
 
 class ChangePasswordPayload(BaseModel):
     username: str
-    current_password: str
+    current_password: Optional[str] = None
     new_password: str
     token: str
+
+
+class UserStateUpdatePayload(BaseModel):
+    user_id: Optional[int] = None
+    username: Optional[str] = None
+    state: Dict[str, Any]
 
 
 class ReviewPayload(BaseModel):
@@ -611,6 +627,31 @@ def _get_password_context():
     return CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
 
+def _resolve_user_from_identifiers(user_id: Optional[int] = None, username: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Resolve user from id or username for state persistence APIs."""
+    from services import db as db_client
+
+    if user_id is not None:
+        try:
+            uid = int(user_id)
+            if uid > 0:
+                conn = db_client._get_conn()
+                cur = conn.cursor()
+                cur.execute("SELECT id, email, username, name FROM users WHERE id = ?", (uid,))
+                row = cur.fetchone()
+                conn.close()
+                if row:
+                    return dict(row)
+        except Exception:
+            pass
+
+    normalized_username = (username or "").strip().lower()
+    if normalized_username:
+        return db_client.get_user_by_username(normalized_username)
+
+    return None
+
+
 @app.post("/auth/register")
 def register_user(payload: RegisterRequest):
     normalized_username = (payload.username or "").strip().lower()
@@ -791,6 +832,40 @@ def delete_user_account(payload: DeleteAccountPayload):
         return {"status": "error", "error": str(e)}
 
 
+@app.get("/auth/user-state")
+def get_user_state(user_id: Optional[int] = None, username: Optional[str] = None):
+    """Fetch backend-persisted app state for cross-device continuity."""
+    try:
+        from services import db as db_client
+        user = _resolve_user_from_identifiers(user_id=user_id, username=username)
+        if not user:
+            return {"status": "error", "error": "User not found"}
+
+        state = db_client.get_user_app_state(int(user.get("id"))) or {}
+        return {"status": "ok", "user_id": user.get("id"), "state": state}
+    except Exception as e:
+        logger.error(f"Get user state error: {e}")
+        return {"status": "error", "error": "Unable to load user state"}
+
+
+@app.put("/auth/user-state")
+def upsert_user_state(payload: UserStateUpdatePayload):
+    """Persist app state in backend DB for multi-device support."""
+    try:
+        from services import db as db_client
+        user = _resolve_user_from_identifiers(user_id=payload.user_id, username=payload.username)
+        if not user:
+            return {"status": "error", "error": "User not found"}
+
+        ok = db_client.upsert_user_app_state(int(user.get("id")), payload.state or {})
+        if not ok:
+            return {"status": "error", "error": "Failed to persist user state"}
+        return {"status": "ok", "user_id": user.get("id")}
+    except Exception as e:
+        logger.error(f"Upsert user state error: {e}")
+        return {"status": "error", "error": "Unable to persist user state"}
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -934,38 +1009,68 @@ def delete_review(review_id: str):
 
 @app.post("/auth/request-otp")
 def request_otp(payload: RequestOtpPayload):
-    """Generate a random 6-digit OTP for the provided phone number and store temporarily.
-    No SMS is sent; OTP is logged to the backend console for testing.
-    """
+    """Generate a random 6-digit OTP and store only its hash with expiry metadata."""
     import random, time
     username = (payload.username or "").strip().lower()
     if not _is_valid_username(username):
         return {"status": "error", "error": "Valid username is required"}
+
+    try:
+        from services import db as db_client
+        if not db_client.get_user_by_username(username):
+            return {"status": "error", "error": "No account exists with this username."}
+    except Exception:
+        return {"status": "error", "error": "Unable to process OTP request right now."}
+
     otp = f"{random.randint(0, 999999):06d}"
-    otp_store[username] = {"otp": otp, "ts": time.time()}
-    logger.warning(f"[OTP GENERATED] Username={username} (log output only in dev)")
-    return {
-        "status": "ok",
-        "message": f"OTP generated. Enter it to verify.",
+    otp_store[username] = {
+        "otp_hash": _hash_otp(username, otp),
+        "ts": time.time(),
+        "attempts": 0,
     }
+    logger.info(f"[OTP GENERATED] Username={username} (hash stored, expires in {OTP_TTL_SECONDS}s)")
+
+    response = {
+        "status": "ok",
+        "message": "OTP generated. Enter it to verify.",
+    }
+    if os.getenv("DEV_UNSAFE_OTP", "0") == "1":
+        # Development-only escape hatch.
+        response["otp"] = otp
+    return response
 
 
 @app.post("/auth/verify-otp")
 def verify_otp(payload: VerifyOtpPayload):
-    import time, secrets
+    import hmac, secrets, time
     username = (payload.username or "").strip().lower()
     entered_otp = (payload.otp or "").strip()
+    if not username:
+        return {"status": "error", "error": "Username is required"}
     if not entered_otp.isdigit() or len(entered_otp) != 6:
         return {"status": "error", "error": "OTP must be a 6-digit code"}
+
     entry = otp_store.get(username)
-    if not entry or entry.get("otp") != entered_otp:
-        return {"status": "error", "error": "Invalid OTP"}
-    # Optional: expire OTP after 5 minutes
-    if time.time() - float(entry.get("ts", 0)) > 300:
+    if not entry:
+        return {"status": "error", "error": "No OTP request found. Please generate a new OTP."}
+
+    if time.time() - float(entry.get("ts", 0)) > OTP_TTL_SECONDS:
         otp_store.pop(username, None)
         return {"status": "error", "error": "OTP expired"}
+
+    attempts = int(entry.get("attempts", 0))
+    if attempts >= 5:
+        otp_store.pop(username, None)
+        return {"status": "error", "error": "Too many invalid attempts. Please request a new OTP."}
+
+    expected_hash = str(entry.get("otp_hash", ""))
+    entered_hash = _hash_otp(username, entered_otp)
+    if not hmac.compare_digest(expected_hash, entered_hash):
+        entry["attempts"] = attempts + 1
+        return {"status": "error", "error": "Invalid OTP"}
+
     # Mark verified by issuing a short-lived session token
-    token = secrets.token_urlsafe(16)
+    token = secrets.token_urlsafe(24)
     verified_sessions[token] = {"username": username, "ts": time.time()}
     # Clear OTP so it cannot be reused
     otp_store.pop(username, None)
@@ -982,7 +1087,7 @@ def change_password(payload: ChangePasswordPayload):
     session = verified_sessions.get(payload.token)
     if not session:
         return {"status": "error", "error": "OTP verification required"}
-    if time.time() - float(session.get("ts", 0)) > 600:
+    if time.time() - float(session.get("ts", 0)) > VERIFIED_SESSION_TTL_SECONDS:
         verified_sessions.pop(payload.token, None)
         return {"status": "error", "error": "Verification session expired"}
 
@@ -1002,10 +1107,6 @@ def change_password(payload: ChangePasswordPayload):
         if not user:
             return {"status": "error", "error": "User not found"}
 
-        existing_hash = user.get("password_hash")
-        if not existing_hash or not pwd_ctx.verify(payload.current_password, existing_hash):
-            return {"status": "error", "error": "Current password is incorrect."}
-
         pw_hash = pwd_ctx.hash(payload.new_password)
         updated = db_client.update_user_password_by_username(normalized_username, pw_hash)
         if not updated:
@@ -1018,8 +1119,12 @@ def change_password(payload: ChangePasswordPayload):
         if not pwd_ctx.verify(payload.new_password, persisted.get("password_hash")):
             return {"status": "error", "error": "Password update failed: verification mismatch"}
 
-        # Invalidate session token after successful change
+        # Invalidate reset state after successful change.
         verified_sessions.pop(payload.token, None)
+        for token, info in list(verified_sessions.items()):
+            if info.get("username") == normalized_username:
+                verified_sessions.pop(token, None)
+        otp_store.pop(normalized_username, None)
         logger.info(f"Password updated successfully for user: {normalized_username}")
         return {"status": "ok", "message": "Password successfully updated."}
     except Exception as e:
