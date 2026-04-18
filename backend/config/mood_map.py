@@ -70,6 +70,42 @@ moodMap = {
         "intensity": "high",
         "aliases": ["unhinged", "chaotic", "wild ride", "messy"],
     },
+    "angry": {
+        "emotions": ["anger", "annoyance"],
+        "tags": ["revenge", "power", "control", "ruthless"],
+        "intensity": "high",
+        "aliases": ["mad", "furious", "rage", "irritated"],
+    },
+    "heartbroken": {
+        "emotions": ["sadness", "grief", "love"],
+        "tags": ["healing", "emotional recovery", "love", "closure"],
+        "intensity": "high",
+        "aliases": ["brokenhearted", "devastated", "heart ache", "heartache"],
+    },
+    "lonely": {
+        "emotions": ["sadness", "caring"],
+        "tags": ["companionship", "introspection", "comfort", "connection"],
+        "intensity": "low",
+        "aliases": ["isolated", "alone", "left out"],
+    },
+    "hungry": {
+        "emotions": ["curiosity", "relief"],
+        "tags": ["comfort", "cozy", "light-hearted", "engaging"],
+        "intensity": "low",
+        "aliases": ["craving", "snacky", "needing comfort", "want food"],
+    },
+    "overthinking": {
+        "emotions": ["confusion", "nervousness", "realization"],
+        "tags": ["psychological", "introspective", "complex", "thought-provoking"],
+        "intensity": "medium",
+        "aliases": ["anxious", "spiraling", "ruminating", "in my head"],
+    },
+    "numb": {
+        "emotions": ["neutral", "sadness"],
+        "tags": ["gentle", "slow burn", "healing", "soft"],
+        "intensity": "low",
+        "aliases": ["empty", "detached", "flat"],
+    },
 }
 
 INTENSITY_MULTIPLIERS = {
@@ -78,3 +114,20 @@ INTENSITY_MULTIPLIERS = {
     "high": 1.12,
     "very_high": 1.2,
 }
+
+
+def resolve_mood_context(text: str):
+    """Return the best matching contextual mood payload for free-form text."""
+    normalized = (text or "").strip().lower()
+    if not normalized:
+      return None, None
+
+    if normalized in moodMap:
+        return normalized, moodMap[normalized]
+
+    for canonical_mood, payload in moodMap.items():
+        for alias in payload.get("aliases", []):
+            if alias and alias.lower() in normalized:
+                return canonical_mood, payload
+
+    return None, None

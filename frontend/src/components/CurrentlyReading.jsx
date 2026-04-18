@@ -1,11 +1,22 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import CategoryStyledBookCard from './CategoryStyledBookCard'
 import SmartNotesPanel from './SmartNotesPanel'
 
-export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, onDislike, onSubmitReview, userId }) {
+export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, onDislike, onSubmitReview, userId, theme = 'light' }) {
+  const emptyTextClass = theme === 'dark' ? 'text-slate-300' : 'text-white'
   const [reviewTarget, setReviewTarget] = useState(null)
   const [rating, setRating] = useState(5)
   const [reviewText, setReviewText] = useState('')
+
+  useEffect(() => {
+    if (!reviewTarget) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [reviewTarget])
 
   function openReviewPrompt(book) {
     setReviewTarget(book)
@@ -29,7 +40,7 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
 
   if (!books.length) {
     return (
-      <div className="text-center text-on-light py-6 sm:py-8 text-xs sm:text-sm italic">
+      <div className={`text-center py-6 sm:py-8 text-xs sm:text-sm italic ${emptyTextClass}`}>
         No books currently reading. Click "Select to Read" on any recommendation to start!
       </div>
     )
@@ -40,7 +51,7 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
   
   if (!nonEducationalBooks.length) {
     return (
-      <div className="text-center text-on-light py-6 sm:py-8 text-xs sm:text-sm italic">
+      <div className={`text-center py-6 sm:py-8 text-xs sm:text-sm italic ${emptyTextClass}`}>
         No books currently reading. Click "Select to Read" on any recommendation to start!
       </div>
     )
@@ -88,7 +99,19 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
                     }
                     if (onUpdateStatus) onUpdateStatus(book.id, next)
                   }}
-                  className="w-full px-2 py-1.5 text-xs rounded-md border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-cool-blue dark:focus:ring-cool-accent transition"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    fontSize: '12px',
+                    borderRadius: '6px',
+                    border: theme === 'dark' ? '1px solid #334155' : '1px solid #9CA3AF',
+                    background: theme === 'dark' ? '#334155' : '#D1D5DB',
+                    color: '#FFFFFF',
+                    focusOutline: 'none',
+                    focusRing: '2px',
+                    focusRingColor: theme === 'dark' ? '#1E90FF' : '#1E90FF',
+                    transition: 'all 0.2s',
+                  }}
                 >
                   <option value="reading">📖 Reading</option>
                   <option value="finished">✓ Finished</option>
@@ -124,22 +147,55 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
         })}
       </div>
 
-      {reviewTarget && (
-        <div className="fixed inset-0 z-[120] bg-black/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={closeReviewPrompt}>
-          <div className="w-full max-w-md rounded-2xl border border-white/20 bg-slate-900/95 p-4 sm:p-5" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base sm:text-lg font-semibold text-white">Rate this book</h3>
-            <p className="text-xs sm:text-sm text-slate-300 mt-1">{reviewTarget.title}</p>
+      {reviewTarget && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          onClick={closeReviewPrompt}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Rate finished book"
+          style={{
+            background: theme === 'dark' ? 'rgba(0, 0, 0, 0.65)' : 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl p-4 sm:p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: theme === 'dark' ? 'rgba(2, 8, 23, 0.98)' : '#1E90FF',
+              border: theme === 'dark' ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid rgba(255, 255, 255, 0.2)',
+              color: '#FFFFFF',
+            }}
+          >
+            <h3
+              className="text-base sm:text-lg font-semibold"
+              style={{ color: '#FFFFFF' }}
+            >
+              Rate this book
+            </h3>
+            <p
+              className="text-xs sm:text-sm mt-1"
+              style={{ color: '#FFFFFF' }}
+            >
+              {reviewTarget.title}
+            </p>
 
             <div className="mt-3">
-              <p className="text-xs text-slate-300 mb-1.5">Star Rating (1-5)</p>
+              <p
+                className="text-xs mb-1.5"
+                style={{ color: '#FFFFFF' }}
+              >
+                Star Rating (1-5)
+              </p>
               <div className="flex items-center gap-1">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <button
                     key={star}
                     type="button"
                     onClick={() => setRating(star)}
-                    className="text-2xl leading-none"
-                    style={{ color: star <= rating ? '#FACC15' : '#64748B' }}
+                    className="text-2xl leading-none transition-colors"
+                    style={{ color: star <= rating ? '#FACC15' : '#80B0FF' }}
                     aria-label={`Rate ${star} star`}
                   >
                     ★
@@ -149,28 +205,52 @@ export default function CurrentlyReading({ books = [], onUpdateStatus, onLike, o
             </div>
 
             <div className="mt-3">
-              <label className="text-xs text-slate-300">Write a short review (optional)</label>
+              <label
+                className="text-xs"
+                style={{ color: '#FFFFFF' }}
+              >
+                Write a short review (optional)
+              </label>
               <textarea
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
                 rows={4}
                 placeholder="What did you enjoy the most?"
-                className="mt-1 w-full rounded-lg bg-slate-800 border border-slate-600 text-slate-100 p-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="mt-1 w-full rounded-lg border p-2 text-sm focus:outline-none focus:ring-2"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  borderColor: 'rgba(255, 255, 255, 0.2)',
+                  color: '#FFFFFF',
+                  placeholderColor: '#80B0FF',
+                }}
               />
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
-              <button onClick={closeReviewPrompt} className="px-3 py-2 text-xs sm:text-sm rounded-md bg-slate-700 text-white">Cancel</button>
+              <button
+                onClick={closeReviewPrompt}
+                className="px-3 py-2 text-xs sm:text-sm rounded-md transition-colors"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  color: '#FFFFFF',
+                }}
+              >
+                Cancel
+              </button>
               <button
                 onClick={handleSubmitReview}
-                className="px-3 py-2 text-xs sm:text-sm rounded-md text-white"
-                style={{ background: '#1E90FF' }}
+                className="px-3 py-2 text-xs sm:text-sm rounded-md transition-colors"
+                style={{
+                  background: '#1E90FF',
+                  color: '#FFFFFF',
+                }}
               >
                 Submit Review
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )

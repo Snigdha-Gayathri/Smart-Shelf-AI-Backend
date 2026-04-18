@@ -2,13 +2,14 @@ import React from 'react'
 import CategoryStyledBookCard from './CategoryStyledBookCard'
 import SmartNotesPanel from './SmartNotesPanel'
 
-export default function EducationalReads({ books = [], onUpdateEduStatus, userId }) {
+export default function EducationalReads({ books = [], onUpdateEduStatus, userId, theme = 'light' }) {
+  const emptyTextClass = theme === 'dark' ? 'text-slate-300' : 'text-white'
   // Only show educational books that are currently learning
   const learningBooks = books.filter(b => b.type === 'educational' && b.eduStatus === 'learning')
 
   if (!learningBooks.length) {
     return (
-      <div className="text-center text-on-light py-6 sm:py-8 text-xs sm:text-sm italic">
+      <div className={`text-center py-6 sm:py-8 text-xs sm:text-sm italic ${emptyTextClass}`}>
         No educational books currently in progress. Click "Start Learning" on any educational recommendation to begin!
       </div>
     )

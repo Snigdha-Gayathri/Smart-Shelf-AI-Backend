@@ -90,6 +90,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   const [userPreferenceModel, setUserPreferenceModel] = useState({});
   
   const [recommendations, setRecommendations] = useState([]);
+  const [lastMoodPrompt, setLastMoodPrompt] = useState('');
+  const [recommendationContext, setRecommendationContext] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
@@ -119,6 +121,8 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
     setReviewInsights(DEFAULT_REVIEW_INSIGHTS);
     setUserPreferenceModel({});
     setRecommendations([]);
+    setLastMoodPrompt('');
+    setRecommendationContext(null);
     setError('');
   };
 
@@ -280,8 +284,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       }
       const currentId = auth?.user?.id
       const currentEmail = auth?.user?.email || ''
-      if (currentId !== nextUser.id || currentEmail !== nextUser.email) {
-        handleAuthSuccess({ user: nextUser })
+      const currentMethod = auth?.authMethod
+      if (currentId !== nextUser.id || currentEmail !== nextUser.email || currentMethod !== 'google') {
+        handleAuthSuccess({ user: nextUser, authMethod: 'google' })
       }
       return
     }
@@ -1249,6 +1254,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
   async function handlePromptSubmit(prompt) {
     setLoading(true);
     setError('');
+    const submittedPrompt = (prompt || '').trim();
+    setLastMoodPrompt(submittedPrompt);
+    setRecommendationContext(null);
     try {
       // Soft readiness check: if /ready is unavailable we still attempt recommendation endpoint.
       try {
@@ -1289,7 +1297,14 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       const recommendationBase = filteredRecommendations.length ? filteredRecommendations : rawRecommendations
       const reviewAwareRecommendations = applyReviewIntelligence(recommendationBase)
       setRecommendations(reviewAwareRecommendations);
-      if (!reviewAwareRecommendations.length) {
+      setRecommendationContext({
+        detectedMood: data.detectedMood || null,
+        matchedMood: data.matchedMood || null,
+        fallbackUsed: Boolean(data.fallbackUsed),
+        clarificationPrompt: data.clarificationPrompt || '',
+        submittedPrompt,
+      });
+      if (!reviewAwareRecommendations.length && !data.clarificationPrompt) {
         setError('No suitable recommendations found for this prompt. Try a different mood or genre.')
       } else {
         setError('')
@@ -1301,6 +1316,33 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
       setLoading(false);
     }
   }
+
+  const recommendationMessage = !lastMoodPrompt
+    ? "What's your mood? Tell me what you feel like reading."
+    : recommendations.length > 0
+      ? 'Here are your mood-based recommendations.'
+      : recommendationContext?.clarificationPrompt || 'I am still tuning your taste. Try a different mood or genre.'
+
+  const currentlyReadingMessage = currentlyReading.length > 0
+    ? "You can do this! Finish them all! 💪 I'm cheering for you!"
+    : "You don't have any books here yet. Add some to start reading."
+
+  const educationalReadsMessage = educationalBooks.some((book) => book.type === 'educational' && book.eduStatus === 'learning')
+    ? 'Keep learning! Knowledge is the best investment you can make 🎓📖'
+    : 'Start your learning journey by adding educational books.'
+
+  const previousReadsMessage = previousReads.length > 0
+    ? 'These are the books you have read! Each one helped me learn your preferences better 📚'
+    : "You haven't read any books yet. Start exploring!"
+
+  const completedEducationalCount = educationalBooks.filter((book) => book.type === 'educational' && book.eduStatus === 'completed').length
+  const yourEducationMessage = completedEducationalCount > 0
+    ? "Here's your learning journey! Every book completed makes you wiser 📊🧠"
+    : 'Complete your first educational book to unlock your learning analytics.'
+
+  const annualWrappedMessage = annualWrapped?.totalBooksRead > 0
+    ? "This is what you have read all this year! Let's celebrate your reading journey 🎉📊"
+    : 'Complete your first educational book to unlock your learning analytics.'
 
   // Poll backend readiness on mount so UI shows a friendly message while server warms up
   useEffect(() => {
@@ -1381,8 +1423,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               
               {/* Q Lexi Assistant with dynamic message */}
               <QLexiAssistant 
-                message={recommendations.length === 0 ? "What's your mood? Tell me what you feel like reading!" : "Here are your quantum recommendations! I analyzed your preferences with quantum thinking ⚛️"}
+                message={recommendationMessage}
                 section="recommendations"
+                theme={theme}
               />
               
               {loading && <SkeletonLoader count={6} />}
@@ -1406,8 +1449,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             
             {/* Q Lexi Assistant */}
             <QLexiAssistant 
-              message="You can do this! Finish them all! 💪 I'm cheering for you!"
+              message={currentlyReadingMessage}
               section="reading"
+              theme={theme}
             />
             
             <CurrentlyReading 
@@ -1417,6 +1461,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               onDislike={handleDislikeBook}
               onSubmitReview={handleSubmitFinishedReview}
               userId={auth?.user?.id}
+              theme={theme}
             />
           </section>
         )}
@@ -1427,14 +1472,16 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary dark:text-primary">📚 Educational Reads</h2>
             
             <QLexiAssistant 
-              message="Keep learning! Knowledge is the best investment you can make 🎓📖"
+              message={educationalReadsMessage}
               section="educational_reads"
+              theme={theme}
             />
             
             <EducationalReads 
               books={educationalBooks}
               onUpdateEduStatus={handleUpdateEduStatus}
               userId={auth?.user?.id}
+              theme={theme}
             />
           </section>
         )}
@@ -1446,12 +1493,13 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             
             {/* Q Lexi Assistant */}
             <QLexiAssistant 
-              message="These are the books you have read! Each one helped me learn your preferences better 📚"
+              message={previousReadsMessage}
               section="previous"
+              theme={theme}
             />
             
             {previousReads.length === 0 ? (
-              <p className="text-center text-on-light text-sm sm:text-base">
+              <p className={`text-center text-sm sm:text-base ${theme === 'dark' ? 'text-slate-300' : 'text-white'}`}>
                 No books finished yet. Complete books in "Currently Reading" to see them here!
               </p>
             ) : (
@@ -1487,11 +1535,12 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary dark:text-primary">🎓 Your Education</h2>
             
             <QLexiAssistant 
-              message="Here's your learning journey! Every book completed makes you wiser 📊🧠"
+              message={yourEducationMessage}
               section="your_education"
+              theme={theme}
             />
             
-            <YourEducation educationalBooks={educationalBooks} />
+            <YourEducation educationalBooks={educationalBooks} theme={theme} />
           </section>
         )}
 
@@ -1507,8 +1556,9 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             
             {/* Q Lexi Assistant */}
             <QLexiAssistant 
-              message="This is what you have read all this year! Let's celebrate your reading journey 🎉📊"
+              message={annualWrappedMessage}
               section="wrapped"
+              theme={theme}
             />
             
             <Dashboard 
@@ -1517,6 +1567,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
               previousReads={previousReads}
               educationalBooks={educationalBooks}
               reviewInsights={reviewInsights}
+              theme={theme}
             />
           </section>
         )}
@@ -1537,6 +1588,7 @@ export default function App({ clerk = { enabled: false, isLoaded: false, isSigne
             <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-primary dark:text-primary">⚙️ Settings</h2>
             <Settings 
               userId={auth?.user?.id}
+              authMethod={auth?.authMethod}
               theme={theme}
               userSettings={userSettings}
               onUpdateSetting={handleUserSettingChange}

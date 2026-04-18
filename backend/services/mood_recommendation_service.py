@@ -112,6 +112,18 @@ def generate_mood_recommendations(query: str, limit: int = 10) -> Dict:
     mood = process_mood_query(query)
     books = get_all_books()
 
+    if mood.get("clarification_prompt") and not mood.get("matched_mood"):
+        return {
+            "detectedMood": mood["detected_mood"],
+            "matchedMood": mood["matched_mood"],
+            "matchedTags": mood["matched_tags"],
+            "matchedEmotions": mood["matched_emotions"],
+            "fallbackUsed": mood["fallback_used"],
+            "similarityScore": mood["similarity_score"],
+            "clarificationPrompt": mood["clarification_prompt"],
+            "recommendations": [],
+        }
+
     if not books:
         return {
             "detectedMood": mood["detected_mood"],
@@ -120,6 +132,7 @@ def generate_mood_recommendations(query: str, limit: int = 10) -> Dict:
             "matchedEmotions": mood["matched_emotions"],
             "fallbackUsed": mood["fallback_used"],
             "similarityScore": mood["similarity_score"],
+            "clarificationPrompt": mood.get("clarification_prompt"),
             "recommendations": [],
         }
 
@@ -185,5 +198,6 @@ def generate_mood_recommendations(query: str, limit: int = 10) -> Dict:
         "matchedEmotions": mood["matched_emotions"],
         "similarityScore": round(mood["similarity_score"], 3),
         "fallbackUsed": mood["fallback_used"],
+        "clarificationPrompt": mood.get("clarification_prompt"),
         "recommendations": recommendations,
     }

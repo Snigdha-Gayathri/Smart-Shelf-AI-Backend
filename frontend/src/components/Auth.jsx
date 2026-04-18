@@ -105,17 +105,11 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
 
   /* Forgot password state */
   const [showForgotModal, setShowForgotModal] = useState(false)
-  const [forgotStep, setForgotStep] = useState('otp')
   const [forgotUsername, setForgotUsername] = useState('')
-  const [forgotOtpInput, setForgotOtpInput] = useState('')
-  const [forgotOtpToken, setForgotOtpToken] = useState('')
   const [forgotNewPass, setForgotNewPass] = useState('')
   const [forgotConfirmPass, setForgotConfirmPass] = useState('')
   const [forgotError, setForgotError] = useState('')
   const [forgotInfo, setForgotInfo] = useState('')
-  const [forgotDemoOtp, setForgotDemoOtp] = useState('')
-  const [forgotRequestLoading, setForgotRequestLoading] = useState(false)
-  const [forgotVerifyLoading, setForgotVerifyLoading] = useState(false)
   const [forgotUpdateLoading, setForgotUpdateLoading] = useState(false)
 
   /* Login handler */
@@ -218,16 +212,10 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
   }
 
   function resetForgotFlow() {
-    setForgotStep('otp')
-    setForgotOtpInput('')
-    setForgotOtpToken('')
     setForgotNewPass('')
     setForgotConfirmPass('')
     setForgotError('')
     setForgotInfo('')
-    setForgotDemoOtp('')
-    setForgotRequestLoading(false)
-    setForgotVerifyLoading(false)
     setForgotUpdateLoading(false)
   }
 
@@ -238,81 +226,34 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
   }
 
   function isForgotPasswordStrong(pw) {
-    return pw.length >= 8 && pw.length <= 16 && /[A-Za-z]/.test(pw) && /\d/.test(pw) && /[^A-Za-z0-9]/.test(pw)
-  }
-
-  async function forgotRequestOtp() {
-    setForgotError('')
-    setForgotInfo('')
-    setForgotDemoOtp('')
-    if (!forgotUsername.trim()) { setForgotError('Username is required.'); return }
-    setForgotRequestLoading(true)
-    try {
-      const res = await fetch(`${API_BASE}/auth/request-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: forgotUsername.trim().toLowerCase() })
-      })
-      const data = await res.json()
-      if (data.status === 'ok') {
-        setForgotDemoOtp(data.otp || '')
-        setForgotInfo(data.otp ? `Demo OTP: ${data.otp}` : (data.message || 'OTP generated.'))
-      } else {
-        setForgotError(data.error || 'Failed to request OTP.')
-      }
-    } catch {
-      setForgotError('Network error. Please try again.')
-    } finally {
-      setForgotRequestLoading(false)
-    }
-  }
-
-  async function forgotVerifyOtp() {
-    setForgotError('')
-    setForgotInfo('')
-    if (!forgotOtpInput.trim()) { setForgotError('OTP is required.'); return }
-    setForgotVerifyLoading(true)
-    try {
-      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: forgotUsername.trim().toLowerCase(), otp: forgotOtpInput.trim() })
-      })
-      const data = await res.json()
-      if (data.status === 'ok' && data.token) {
-        setForgotOtpToken(data.token)
-        setForgotStep('password')
-        setForgotInfo('OTP verified. Set your new password.')
-      } else {
-        setForgotError(data.error || 'Invalid OTP.')
-      }
-    } catch {
-      setForgotError('Network error. Please try again.')
-    } finally {
-      setForgotVerifyLoading(false)
-    }
+    return allPasswordRulesPass(pw)
   }
 
   async function forgotSubmitNewPassword() {
     setForgotError('')
     setForgotInfo('')
+    if (!forgotUsername.trim()) {
+      setForgotError('Username is required.')
+      return
+    }
     if (!isForgotPasswordStrong(forgotNewPass)) {
-      setForgotError('Password must be 8–16 characters with letters, numbers, and a special character.')
+      const failed = PASSWORD_RULES.find((r) => !r.test(forgotNewPass))
+      setForgotError(failed ? failed.label : 'Password does not meet all requirements.')
       return
     }
     if (forgotNewPass !== forgotConfirmPass) { setForgotError('Passwords do not match.'); return }
     setForgotUpdateLoading(true)
     try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
+      const res = await fetch(`${API_BASE}/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: forgotUsername, new_password: forgotNewPass, token: forgotOtpToken })
+        body: JSON.stringify({ identifier: forgotUsername.trim().toLowerCase(), new_password: forgotNewPass })
       })
       const data = await res.json()
       if (data.status === 'ok') {
         setLoginUsername(forgotUsername.trim().toLowerCase())
         setLoginPassword('')
-        setLoginSuccess('Password updated successfully. Please log in.')
+        setLoginSuccess(data.message || 'Password updated successfully')
         setShowForgotModal(false)
         resetForgotFlow()
       } else {
@@ -560,73 +501,39 @@ export default function Auth({ onSuccess, googleAuthEnabled = false, theme = 'li
           >
             <h3 className="auth-card-title" style={{ fontSize: '22px', marginBottom: '16px' }}>Reset Password</h3>
 
-            {forgotStep === 'otp' && (
-              <div className="auth-forgot-step">
-                <label className="auth-forgot-label">Username</label>
-                <div className="auth-input-wrapper">
-                  <input
-                    type="text"
-                    value={forgotUsername}
-                    onChange={(e) => setForgotUsername(e.target.value)}
-                    className="auth-input-new"
-                    placeholder="Your username"
-                  />
-                </div>
-                <label className="auth-forgot-label">One-Time Password (OTP)</label>
-                <div className="auth-input-wrapper">
-                  <input
-                    type="text"
-                    value={forgotOtpInput}
-                    onChange={(e) => setForgotOtpInput(e.target.value)}
-                    className="auth-input-new"
-                    placeholder="Enter OTP"
-                    maxLength={6}
-                  />
-                </div>
-                {forgotDemoOtp && <div className="auth-forgot-otp-hint">Demo OTP: <strong>{forgotDemoOtp}</strong></div>}
-                {forgotInfo && <p className="auth-forgot-info">{forgotInfo}</p>}
-                {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
-                <div className="auth-forgot-actions">
-                  <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
-                  <button type="button" className="auth-forgot-secondary-btn" onClick={forgotRequestOtp} disabled={forgotRequestLoading || forgotVerifyLoading || forgotUpdateLoading}>{forgotRequestLoading ? 'Generating...' : 'Generate OTP'}</button>
-                  <button type="button" className={`auth-btn-primary auth-forgot-confirm-btn ${forgotVerifyLoading ? 'auth-btn-primary-loading' : ''}`} onClick={forgotVerifyOtp} disabled={forgotVerifyLoading || forgotRequestLoading || forgotUpdateLoading}>{forgotVerifyLoading ? 'Verifying...' : 'Verify OTP'}</button>
-                </div>
+            <div className="auth-forgot-step">
+              <label className="auth-forgot-label">Username</label>
+              <div className="auth-input-wrapper">
+                <input
+                  type="text"
+                  value={forgotUsername}
+                  onChange={(e) => setForgotUsername(e.target.value)}
+                  className="auth-input-new"
+                  placeholder="Your username"
+                />
               </div>
-            )}
-
-            {forgotStep === 'password' && (
-              <div className="auth-forgot-step">
-                <label className="auth-forgot-label">New Password</label>
-                <div className="auth-input-wrapper">
-                  <input type="password" value={forgotNewPass} onChange={(e) => setForgotNewPass(e.target.value)} className="auth-input-new" placeholder="New password (8-16 chars)" />
-                </div>
-                <label className="auth-forgot-label">Confirm New Password</label>
-                <div className="auth-input-wrapper">
-                  <input type="password" value={forgotConfirmPass} onChange={(e) => setForgotConfirmPass(e.target.value)} className="auth-input-new" placeholder="Confirm new password" />
-                </div>
-                {forgotInfo && <p className="auth-forgot-info">{forgotInfo}</p>}
-                {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
-                <div className="auth-forgot-actions">
-                  <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
-                  <button
-                    type="button"
-                    className={`auth-btn-primary auth-forgot-confirm-btn ${forgotUpdateLoading ? 'auth-btn-primary-loading' : ''}`}
-                    disabled={forgotUpdateLoading || !forgotNewPass || forgotNewPass !== forgotConfirmPass || !isForgotPasswordStrong(forgotNewPass)}
-                    onClick={forgotSubmitNewPassword}
-                  >
-                    {forgotUpdateLoading ? 'Updating...' : 'Update Password'}
-                  </button>
-                </div>
+              <label className="auth-forgot-label">New Password</label>
+              <div className="auth-input-wrapper">
+                <input type="password" value={forgotNewPass} onChange={(e) => setForgotNewPass(e.target.value)} className="auth-input-new" placeholder="Enter new password" />
               </div>
-            )}
-
-            {forgotStep === 'success' && (
-              <div className="auth-forgot-step" style={{ textAlign: 'center' }}>
-                <div className="auth-msg-new auth-msg-success" style={{ fontSize: '14px', padding: '12px' }}>\u2713 Password updated successfully!</div>
-                {forgotInfo && <p className="auth-forgot-info" style={{ marginTop: '8px' }}>{forgotInfo}</p>}
-                <button type="button" className="auth-btn-primary" style={{ marginTop: '16px', padding: '10px' }} onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Close</button>
+              <label className="auth-forgot-label">Confirm New Password</label>
+              <div className="auth-input-wrapper">
+                <input type="password" value={forgotConfirmPass} onChange={(e) => setForgotConfirmPass(e.target.value)} className="auth-input-new" placeholder="Confirm new password" />
               </div>
-            )}
+              {forgotInfo && <p className="auth-forgot-info">{forgotInfo}</p>}
+              {forgotError && <p className="auth-forgot-error">{forgotError}</p>}
+              <div className="auth-forgot-actions">
+                <button type="button" className="auth-forgot-cancel-btn" onClick={() => { setShowForgotModal(false); resetForgotFlow() }}>Cancel</button>
+                <button
+                  type="button"
+                  className={`auth-btn-primary auth-forgot-confirm-btn ${forgotUpdateLoading ? 'auth-btn-primary-loading' : ''}`}
+                  disabled={forgotUpdateLoading || !forgotUsername.trim() || !forgotNewPass || forgotNewPass !== forgotConfirmPass || !isForgotPasswordStrong(forgotNewPass)}
+                  onClick={forgotSubmitNewPassword}
+                >
+                  {forgotUpdateLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
+            </div>
           </motion.div>
         </div>
       )}

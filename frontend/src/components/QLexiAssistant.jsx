@@ -2,7 +2,12 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import qlexiImage from '../assets/qlexi-intro-removebg-preview-removebg-preview.png';
 
-export default function QLexiAssistant({ message, section }) {
+export default function QLexiAssistant({ message, section, theme = 'light' }) {
+  const isDarkMode = theme === 'dark';
+  const bubbleBackground = isDarkMode
+    ? 'linear-gradient(135deg, rgba(30, 144, 255, 0.75) 0%, rgba(59, 130, 246, 0.65) 100%)'
+    : 'linear-gradient(135deg, rgba(7, 61, 164, 0.96) 0%, rgba(13, 101, 218, 0.94) 55%, rgba(30, 144, 255, 0.90) 100%)';
+  const pointerColor = isDarkMode ? 'rgba(30, 144, 255, 0.95)' : 'rgba(9, 74, 189, 0.98)';
   return (
     <div className="flex items-start gap-3 sm:gap-4 mb-6 sm:mb-8">
       {/* Q Lexi Character - Using actual Q Lexi image */}
@@ -54,16 +59,14 @@ export default function QLexiAssistant({ message, section }) {
             style={{
               borderTop: '6px solid transparent',
               borderBottom: '6px solid transparent',
-              borderRight: '10px solid rgba(30, 144, 255, 0.95)',
+              borderRight: `10px solid ${pointerColor}`,
             }}
           />
           
           {/* Speech bubble content */}
           <div
-            className="rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 shadow-lg backdrop-blur-xl border border-white/25"
-            style={{
-              background: 'linear-gradient(135deg, rgba(30, 144, 255, 0.75) 0%, rgba(59, 130, 246, 0.65) 100%)',
-            }}
+            className="rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3 shadow-xl backdrop-blur-xl border border-white/25"
+            style={{ background: bubbleBackground }}
           >
             <motion.p
               className="text-white text-xs sm:text-sm md:text-base font-medium leading-relaxed"

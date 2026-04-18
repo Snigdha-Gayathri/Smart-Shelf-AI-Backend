@@ -16,6 +16,10 @@ const CARD_BG  = 'rgba(15,23,42,0.65)'
 const CARD_BORDER = `rgba(30,144,255,0.22)`
 const GLOW     = `0 0 20px ${BLUE}, 0 0 40px rgba(30,144,255,0.6)`
 const GLOW_SOFT = `0 0 14px rgba(30,144,255,0.25)`
+const LIGHT_CARD_BG = 'linear-gradient(145deg, rgba(8,46,122,0.96) 0%, rgba(10,68,154,0.95) 52%, rgba(16,94,186,0.94) 100%)'
+const LIGHT_CARD_BORDER = 'rgba(186, 218, 255, 0.42)'
+const LIGHT_CARD_SHADOW = '0 18px 42px rgba(11, 66, 156, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.10) inset'
+const LIGHT_HOVER_GLOW = '0 0 0 1px rgba(186, 218, 255, 0.48), 0 0 28px rgba(11,79,197,0.86), 0 0 48px rgba(8,58,152,0.72)'
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 // ── deterministic hash for stable pseudo-random values ──
@@ -86,8 +90,21 @@ function enrichBook(book) {
 // ══════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
-export default function YourEducation({ educationalBooks = [] }) {
-  const [expandedBook, setExpandedBook] = useState(null)
+export default function YourEducation({ educationalBooks = [], theme = 'light' }) {
+  const isDarkMode = theme === 'dark'
+  const primaryBlue = isDarkMode ? BLUE : '#0B4FC5'
+  const darkLabelBlue = isDarkMode ? `${BLUE}CC` : '#0A4FC5'
+  const cardHover = isDarkMode ? undefined : { boxShadow: LIGHT_HOVER_GLOW, scale: 1.005 }
+  const brightNumberStyle = isDarkMode
+    ? undefined
+    : { color: '#8FDBFF', textShadow: '0 0 10px rgba(143,219,255,0.95), 0 0 22px rgba(32,159,255,0.8)' }
+  const [expandedBookKey, setExpandedBookKey] = useState(null)
+  const surfaceStyle = isDarkMode
+    ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }
+    : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(18px)' }
+  const emptyStateStyle = isDarkMode
+    ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }
+    : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(20px)' }
 
   // 1️⃣ Filter only completed educational books
   const finishedEducationalBooks = useMemo(
@@ -285,10 +302,10 @@ export default function YourEducation({ educationalBooks = [] }) {
           initial={{ opacity: 0, scale: 0.92 }}
           animate={{ opacity: 1, scale: 1 }}
           className="text-center p-10 rounded-2xl max-w-md"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={emptyStateStyle}
         >
           <div className="text-5xl mb-5">📚</div>
-          <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
+          <p className={`text-sm sm:text-base leading-relaxed ${isDarkMode ? 'text-slate-300' : 'text-white'}`}>
             Complete your first educational book to unlock your learning analytics.
           </p>
           <div className="mt-5 h-0.5 w-28 mx-auto rounded-full" style={{ background: `linear-gradient(90deg, transparent, ${BLUE}80, transparent)` }} />
@@ -303,32 +320,32 @@ export default function YourEducation({ educationalBooks = [] }) {
       {/* ════════════════════  TOP ROW  ════════════════════ */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Learning Depth Score — Circular */}
-        <GlowCard delay={0}>
-          <CircularProgress value={depthScore} size={100} label="Learning Depth" color={BLUE} />
+        <GlowCard delay={0} theme={theme}>
+          <CircularProgress value={depthScore} size={100} label="Learning Depth" color={primaryBlue} />
         </GlowCard>
 
         {/* Total Books */}
-        <GlowCard delay={0.08}>
+        <GlowCard delay={0.08} theme={theme}>
           <div className="text-center">
             <div className="text-lg mb-1">📘</div>
-            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${BLUE}CC` }}>Books Completed</div>
-            <AnimatedNumber value={totalBooks} className="text-3xl sm:text-4xl font-black text-white" />
+            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: darkLabelBlue }}>Books Completed</div>
+            <AnimatedNumber value={totalBooks} className="text-3xl sm:text-4xl font-black" styleOverride={brightNumberStyle} />
             <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">{avgHours} avg hrs/book</p>
           </div>
         </GlowCard>
 
         {/* Total Learning Hours */}
-        <GlowCard delay={0.16}>
+        <GlowCard delay={0.16} theme={theme}>
           <div className="text-center">
             <div className="text-lg mb-1">⏱️</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${GREEN}CC` }}>Learning Hours</div>
-            <AnimatedNumber value={totalHours} className="text-3xl sm:text-4xl font-black text-white" suffix="h" />
+            <AnimatedNumber value={totalHours} className="text-3xl sm:text-4xl font-black" suffix="h" styleOverride={brightNumberStyle} />
             <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">total estimated</p>
           </div>
         </GlowCard>
 
         {/* Academic Level Badge */}
-        <GlowCard delay={0.24}>
+        <GlowCard delay={0.24} theme={theme}>
           <div className="text-center flex flex-col items-center justify-center h-full">
             <div className="text-lg mb-1">🎓</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: `${GOLD}CC` }}>Academic Level</div>
@@ -353,16 +370,16 @@ export default function YourEducation({ educationalBooks = [] }) {
 
       {/* Additional Education Analytics — Same grid as top row */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
-        <GlowCard delay={0.3}>
+        <GlowCard delay={0.3} theme={theme}>
           <div className="text-center w-full h-full flex flex-col items-center justify-center">
             <div className="text-lg mb-1">🧩</div>
-            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${BLUE}CC` }}>Learning Retention</div>
-            <AnimatedNumber value={learningRetention.score} className="text-3xl sm:text-4xl font-black text-white" suffix="%" />
+            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: darkLabelBlue }}>Learning Retention</div>
+            <AnimatedNumber value={learningRetention.score} className="text-3xl sm:text-4xl font-black" suffix="%" styleOverride={brightNumberStyle} />
             <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">{learningRetention.subtitle}</p>
           </div>
         </GlowCard>
 
-        <GlowCard delay={0.36}>
+        <GlowCard delay={0.36} theme={theme}>
           <div className="text-center w-full h-full flex flex-col items-center justify-center">
             <div className="text-lg mb-1">🧠</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${ROSE}CC` }}>Cognitive Load</div>
@@ -371,16 +388,16 @@ export default function YourEducation({ educationalBooks = [] }) {
           </div>
         </GlowCard>
 
-        <GlowCard delay={0.42}>
+        <GlowCard delay={0.42} theme={theme}>
           <div className="text-center w-full h-full flex flex-col items-center justify-center">
             <div className="text-lg mb-1">🎯</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${GREEN}CC` }}>Focus Stability</div>
-            <AnimatedNumber value={focusStability.score} className="text-3xl sm:text-4xl font-black text-white" suffix="%" />
+            <AnimatedNumber value={focusStability.score} className="text-3xl sm:text-4xl font-black" suffix="%" styleOverride={brightNumberStyle} />
             <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">Consistency of topics and switching control</p>
           </div>
         </GlowCard>
 
-        <GlowCard delay={0.48}>
+        <GlowCard delay={0.48} theme={theme}>
           <div className="text-center w-full h-full flex flex-col items-center justify-center">
             <div className="text-lg mb-1">🌐</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${CYAN}CC` }}>Interdisciplinary Index</div>
@@ -389,11 +406,11 @@ export default function YourEducation({ educationalBooks = [] }) {
           </div>
         </GlowCard>
 
-        <GlowCard delay={0.54}>
+        <GlowCard delay={0.54} theme={theme}>
           <div className="text-center w-full h-full flex flex-col items-center justify-center">
             <div className="text-lg mb-1">⚙️</div>
             <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${GOLD}CC` }}>Completion Efficiency</div>
-            <AnimatedNumber value={completionEfficiency.score} className="text-3xl sm:text-4xl font-black text-white" suffix="%" />
+            <AnimatedNumber value={completionEfficiency.score} className="text-3xl sm:text-4xl font-black" suffix="%" styleOverride={brightNumberStyle} />
             <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">Completion speed adjusted by difficulty</p>
           </div>
         </GlowCard>
@@ -404,18 +421,18 @@ export default function YourEducation({ educationalBooks = [] }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.42 }}
         className="p-5 sm:p-6 rounded-2xl"
-        style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+        style={surfaceStyle}
       >
         <SectionHeading icon="📈" title="Learning Growth" />
         <div className="mt-5" style={{ height: '180px' }}>
           <svg width="100%" height="180" viewBox="0 0 360 180" preserveAspectRatio="none">
             {[0.25, 0.5, 0.75].map((fraction) => (
-              <line key={fraction} x1="0" y1={180 - fraction * 160} x2="360" y2={180 - fraction * 160} stroke={`${BLUE}12`} strokeWidth="1" />
+              <line key={fraction} x1="0" y1={180 - fraction * 160} x2="360" y2={180 - fraction * 160} stroke={`${primaryBlue}16`} strokeWidth="1" />
             ))}
 
             <motion.path
               d={`M ${learningGrowth.points.map((point, idx) => `${idx * (360 / 11)} ${180 - (point.depth / learningGrowth.maxDepth) * 155}`).join(' L ')} L ${11 * (360 / 11)} 180 L 0 180 Z`}
-              fill={`${BLUE}16`}
+              fill={`${primaryBlue}20`}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.52, duration: 0.8 }}
@@ -424,14 +441,14 @@ export default function YourEducation({ educationalBooks = [] }) {
             <motion.polyline
               points={learningGrowth.points.map((point, idx) => `${idx * (360 / 11)},${180 - (point.depth / learningGrowth.maxDepth) * 155}`).join(' ')}
               fill="none"
-              stroke={BLUE}
+              stroke={primaryBlue}
               strokeWidth="2.5"
               strokeLinecap="round"
               strokeLinejoin="round"
               initial={{ pathLength: 0 }}
               animate={{ pathLength: 1 }}
               transition={{ delay: 0.5, duration: 1.1 }}
-              style={{ filter: `drop-shadow(0 0 6px ${BLUE})` }}
+              style={{ filter: `drop-shadow(0 0 6px ${primaryBlue})` }}
             />
 
             {learningGrowth.points.map((point, idx) => point.depth > 0 && (
@@ -440,7 +457,7 @@ export default function YourEducation({ educationalBooks = [] }) {
                 cx={idx * (360 / 11)}
                 cy={180 - (point.depth / learningGrowth.maxDepth) * 155}
                 r="4"
-                fill={BLUE}
+                fill={primaryBlue}
                 stroke="#fff"
                 strokeWidth="1.5"
                 initial={{ scale: 0 }}
@@ -466,7 +483,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.48 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="🎓" title="Topic Focus Distribution" />
           <div className="mt-5 space-y-3">
@@ -480,7 +497,7 @@ export default function YourEducation({ educationalBooks = [] }) {
               const total = finishedEducationalBooks.length
               return sorted.map(([topic, count], i) => {
                 const pct = total > 0 ? (count / total) * 100 : 0
-                const colors = [BLUE, GREEN, GOLD, ROSE, CYAN]
+                const colors = [primaryBlue, GREEN, GOLD, ROSE, CYAN]
                 const color = colors[i % colors.length]
                 return (
                   <div key={topic}>
@@ -513,7 +530,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.54 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="💡" title="Learning Intelligence" />
           <div className="mt-5 space-y-3">
@@ -566,7 +583,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="🎯" title="Growth Opportunities" />
           <div className="mt-5 space-y-3">
@@ -607,7 +624,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.66 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="🏔️" title="Subject Mastery Journey" />
           <div className="mt-5 space-y-3">
@@ -659,7 +676,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="📊" title="Difficulty Distribution" />
           <div className="space-y-4 mt-5">
@@ -698,10 +715,10 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.38 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="🧠" title="Skill Coverage Radar" />
-          <SkillRadar skillCounts={skillCounts} />
+          <SkillRadar skillCounts={skillCounts} theme={theme} />
         </motion.div>
       </div>
 
@@ -713,11 +730,11 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.45 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="⚡" title="Completion Velocity" />
           <div className="grid grid-cols-3 gap-3 mt-5">
-            <VelocityStat label="Average" value={`${velocity.avg}d`} color={BLUE} delay={0.55} />
+            <VelocityStat label="Average" value={`${velocity.avg}d`} color={primaryBlue} delay={0.55} />
             <VelocityStat label="Fastest" value={`${velocity.fastest}d`} color={GREEN} delay={0.63} />
             <VelocityStat label="Slowest" value={`${velocity.slowest}d`} color={GOLD} delay={0.71} />
           </div>
@@ -730,7 +747,7 @@ export default function YourEducation({ educationalBooks = [] }) {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.52 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={surfaceStyle}
         >
           <SectionHeading icon="🔥" title="Learning Summary" />
           <div className="space-y-3 mt-5">
@@ -749,28 +766,30 @@ export default function YourEducation({ educationalBooks = [] }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
         className="p-5 sm:p-6 rounded-2xl"
-        style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+        style={surfaceStyle}
       >
         <SectionHeading icon="📘" title="Book-by-Book Intelligence" sub="Tap any book for detailed learning telemetry" />
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-5">
-          {finishedEducationalBooks.map((book, idx) => (
+          {finishedEducationalBooks.map((book, idx) => {
+            const bookKey = String(book.id ?? `${book.title || 'book'}-${idx}`)
+            return (
             <motion.div
               key={book.id || idx}
               layout
-              onClick={() => setExpandedBook(expandedBook === idx ? null : idx)}
+              onClick={() => setExpandedBookKey(expandedBookKey === bookKey ? null : bookKey)}
               className="cursor-pointer rounded-xl overflow-hidden transition-all duration-300"
-              whileHover={{ scale: 1.02 }}
+              whileHover={{ scale: 1.02, boxShadow: isDarkMode ? GLOW : LIGHT_HOVER_GLOW }}
               style={{
-                border: `2px solid ${expandedBook === idx ? BLUE : CARD_BORDER}`,
-                background: expandedBook === idx ? `linear-gradient(135deg, ${BLUE}12, ${GREEN}06)` : 'rgba(15,23,42,0.5)',
-                boxShadow: expandedBook === idx ? GLOW : 'none',
+                border: `2px solid ${expandedBookKey === bookKey ? BLUE : CARD_BORDER}`,
+                background: expandedBookKey === bookKey ? `linear-gradient(135deg, ${BLUE}12, ${GREEN}06)` : 'rgba(15,23,42,0.5)',
+                boxShadow: expandedBookKey === bookKey ? GLOW : 'none',
               }}
             >
               {/* Header */}
               <div className="p-3 sm:p-4 flex items-start gap-3">
                 <div className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold"
-                  style={{ background: `${BLUE}25`, border: `1px solid ${BLUE}40`, color: BLUE }}
+                  style={{ background: `${primaryBlue}30`, border: `1px solid ${primaryBlue}60`, color: primaryBlue }}
                 >
                   {idx + 1}
                 </div>
@@ -783,7 +802,7 @@ export default function YourEducation({ educationalBooks = [] }) {
 
               {/* Expanded */}
               <AnimatePresence>
-                {expandedBook === idx && (
+                {expandedBookKey === bookKey && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
                     animate={{ height: 'auto', opacity: 1 }}
@@ -793,7 +812,7 @@ export default function YourEducation({ educationalBooks = [] }) {
                   >
                     <div className="px-3 sm:px-4 pb-3 sm:pb-4 space-y-2.5">
                       <div className="grid grid-cols-2 gap-2">
-                        <MiniBar label="Hours" value={`${book.estimatedHours}h`} pct={(book.estimatedHours / Math.max(...finishedEducationalBooks.map(b => b.estimatedHours))) * 100} color={BLUE} />
+                        <MiniBar label="Hours" value={`${book.estimatedHours}h`} pct={(book.estimatedHours / Math.max(...finishedEducationalBooks.map(b => b.estimatedHours))) * 100} color={primaryBlue} />
                         <MiniBar label="Pages" value={book.pages} pct={(book.pages / Math.max(...finishedEducationalBooks.map(b => b.pages))) * 100} color={GREEN} />
                         <MiniBar label="Days" value={`${book.daysTaken}d`} pct={(book.daysTaken / velocity.slowest) * 100} color={GOLD} />
                         <MiniBar label="Difficulty" value={book.difficulty} pct={book.difficulty === 'Beginner' ? 33 : book.difficulty === 'Intermediate' ? 66 : 100} color={ROSE} />
@@ -814,7 +833,8 @@ export default function YourEducation({ educationalBooks = [] }) {
                 )}
               </AnimatePresence>
             </motion.div>
-          ))}
+            )
+          })}
         </div>
       </motion.div>
     </div>
@@ -827,7 +847,7 @@ export default function YourEducation({ educationalBooks = [] }) {
  * ══════════════════════════════════════════════════════════════ */
 
 // ── Animated counter ──
-function AnimatedNumber({ value, className = '', suffix = '' }) {
+function AnimatedNumber({ value, className = '', suffix = '', styleOverride }) {
   const [display, setDisplay] = useState(0)
   const ref = useRef(null)
   useEffect(() => {
@@ -843,7 +863,7 @@ function AnimatedNumber({ value, className = '', suffix = '' }) {
     }, step)
     return () => clearInterval(timer)
   }, [value])
-  return <div ref={ref} className={className}>{display}{suffix}</div>
+  return <div ref={ref} className={className} style={styleOverride}>{display}{suffix}</div>
 }
 
 // ── Circular progress ring ──
@@ -876,16 +896,17 @@ function CircularProgress({ value, size = 100, label, color }) {
   )
 }
 
-// ── Glow Card wrapper ──
-function GlowCard({ children, delay = 0 }) {
+function GlowCard({ children, delay = 0, theme = 'light' }) {
+  const isDarkMode = theme === 'dark'
+  const hoverGlow = isDarkMode ? GLOW : LIGHT_HOVER_GLOW
   return (
     <motion.div
       initial={{ opacity: 0, y: 20, scale: 0.96 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ delay, duration: 0.5 }}
-      whileHover={{ scale: 1.02, boxShadow: GLOW }}
-      className="relative p-4 sm:p-5 rounded-2xl flex items-center justify-center overflow-hidden transition-shadow duration-300"
-      style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+      whileHover={{ scale: 1.02, boxShadow: hoverGlow }}
+      className="relative p-4 sm:p-5 rounded-2xl flex items-center justify-center overflow-hidden transition-shadow duration-100"
+      style={isDarkMode ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT } : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(18px)' }}
     >
       {/* Scan line */}
       <motion.div
@@ -913,7 +934,9 @@ function SectionHeading({ icon, title, sub }) {
 }
 
 // ── Skill Radar (pure CSS/SVG) ──
-function SkillRadar({ skillCounts }) {
+function SkillRadar({ skillCounts, theme = 'light' }) {
+  const isDarkMode = theme === 'dark'
+  const chartBlue = isDarkMode ? BLUE : '#0B4FC5'
   const entries = Object.entries(skillCounts).sort((a, b) => b[1] - a[1]).slice(0, 8)
   const max = Math.max(...entries.map(e => e[1]), 1)
 
@@ -927,15 +950,15 @@ function SkillRadar({ skillCounts }) {
           <div key={skill}>
             <div className="flex justify-between mb-1">
               <span className="text-xs text-slate-300">{skill}</span>
-              <span className="text-xs font-bold" style={{ color: BLUE }}>{count}</span>
+              <span className="text-xs font-bold" style={{ color: chartBlue }}>{count}</span>
             </div>
-            <div className="h-3 rounded-full overflow-hidden" style={{ background: `${BLUE}10` }}>
+            <div className="h-3 rounded-full overflow-hidden" style={{ background: `${chartBlue}10` }}>
               <motion.div
                 initial={{ width: 0 }}
                 animate={{ width: `${(count / max) * 100}%` }}
                 transition={{ delay: 0.5 + i * 0.1, duration: 0.7 }}
                 className="h-full rounded-full"
-                style={{ background: BLUE, boxShadow: `0 0 8px ${BLUE}50` }}
+                style={{ background: chartBlue, boxShadow: `0 0 8px ${chartBlue}50` }}
               />
             </div>
           </div>
@@ -967,24 +990,24 @@ function SkillRadar({ skillCounts }) {
           <polygon
             key={r}
             points={entries.map((_, i) => getPoint(i, R * r).join(',')).join(' ')}
-            fill="none" stroke={`${BLUE}18`} strokeWidth="1"
+            fill="none" stroke={`${chartBlue}18`} strokeWidth="1"
           />
         ))}
         {/* Axis lines */}
         {entries.map((_, i) => {
           const [px, py] = getPoint(i, R)
-          return <line key={i} x1={cx} y1={cy} x2={px} y2={py} stroke={`${BLUE}15`} strokeWidth="1" />
+          return <line key={i} x1={cx} y1={cy} x2={px} y2={py} stroke={`${chartBlue}15`} strokeWidth="1" />
         })}
         {/* Data polygon */}
         <motion.path
           d={dataPath}
-          fill={`${BLUE}20`}
+          fill={`${chartBlue}20`}
           stroke={BLUE}
           strokeWidth="2"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.6, duration: 0.8 }}
-          style={{ filter: `drop-shadow(0 0 6px ${BLUE}50)` }}
+          style={{ filter: `drop-shadow(0 0 6px ${chartBlue}50)` }}
         />
         {/* Data dots + labels */}
         {entries.map(([skill, count], i) => {
@@ -997,7 +1020,7 @@ function SkillRadar({ skillCounts }) {
                 fill={BLUE} stroke="#fff" strokeWidth="1.5"
                 initial={{ scale: 0 }} animate={{ scale: 1 }}
                 transition={{ delay: 0.7 + i * 0.06, type: 'spring' }}
-                style={{ filter: `drop-shadow(0 0 4px ${BLUE})` }}
+                style={{ filter: `drop-shadow(0 0 4px ${chartBlue})` }}
               />
               <text x={lx} y={ly} textAnchor="middle" dominantBaseline="middle"
                 className="text-[9px] sm:text-[10px] fill-slate-400 font-medium"

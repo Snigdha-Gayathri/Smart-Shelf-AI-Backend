@@ -1213,24 +1213,26 @@ html.dark .auth-pw-rule.fail { color: #ef9c9c; }
   inset: 0;
   background: rgba(20, 44, 90, 0.45);
   backdrop-filter: blur(7px);
-  z-index: 100;
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 20px;
+  overflow-y: auto;
 }
 html.dark .auth-forgot-overlay {
   background: rgba(3, 8, 18, 0.64);
 }
 .auth-forgot-modal {
-  background: linear-gradient(150deg, rgba(255, 255, 255, 0.97), rgba(232, 246, 255, 0.93));
-  border: 1.5px solid rgba(255, 255, 255, 0.92);
+  background: linear-gradient(150deg, rgba(30, 144, 255, 0.96), rgba(21, 122, 225, 0.95));
+  border: 1.5px solid rgba(202, 228, 255, 0.78);
   border-radius: 24px;
-  box-shadow: 0 20px 54px rgba(30, 95, 198, 0.26), inset 0 2px 16px rgba(255, 255, 255, 0.85);
+  box-shadow: 0 20px 54px rgba(9, 58, 136, 0.42), inset 0 2px 16px rgba(196, 227, 255, 0.32);
   padding: 28px 26px 24px;
   width: 100%;
   max-width: 390px;
   font-family: 'Times New Roman', Times, serif;
+  color: #eef7ff;
 }
 html.dark .auth-forgot-modal {
   background: linear-gradient(152deg, rgba(9, 20, 40, 0.97), rgba(11, 28, 54, 0.95));
@@ -1244,7 +1246,7 @@ html.dark .auth-forgot-modal {
 }
 .auth-forgot-label {
   font-size: 13px;
-  color: #3a5f8a;
+  color: #eaf5ff;
   letter-spacing: 0.03em;
   font-family: 'Times New Roman', Times, serif;
 }
@@ -1253,15 +1255,15 @@ html.dark .auth-forgot-label {
 }
 .auth-forgot-otp-hint {
   font-size: 12.5px;
-  color: #1a6e3c;
-  background: rgba(34, 197, 94, 0.11);
-  border: 1px solid rgba(34, 197, 94, 0.28);
+  color: #f2f9ff;
+  background: rgba(9, 40, 92, 0.32);
+  border: 1px solid rgba(179, 218, 255, 0.44);
   border-radius: 10px;
   padding: 7px 10px;
 }
 .auth-forgot-info {
   font-size: 12.5px;
-  color: #0e66be;
+  color: #e6f4ff;
   margin: 0;
   font-family: 'Times New Roman', Times, serif;
 }
@@ -1270,7 +1272,7 @@ html.dark .auth-forgot-info {
 }
 .auth-forgot-error {
   font-size: 12.5px;
-  color: #ab2828;
+  color: #ffe2e2;
   margin: 0;
   font-family: 'Times New Roman', Times, serif;
 }
@@ -1279,6 +1281,7 @@ html.dark .auth-forgot-error {
 }
 .auth-forgot-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 10px;
 }
@@ -1286,9 +1289,9 @@ html.dark .auth-forgot-error {
   flex: 1;
   padding: 9px 6px;
   border-radius: 12px;
-  border: 1.5px solid rgba(190, 214, 244, 0.9);
-  background: rgba(255, 255, 255, 0.82);
-  color: #35577f;
+  border: 1.5px solid rgba(184, 220, 255, 0.62);
+  background: rgba(7, 53, 117, 0.45);
+  color: #e7f4ff;
   font-size: 14px;
   font-family: 'Times New Roman', Times, serif;
   cursor: pointer;
@@ -1299,15 +1302,15 @@ html.dark .auth-forgot-cancel-btn {
   background: rgba(14, 31, 57, 0.85);
   color: #b8d2f3;
 }
-.auth-forgot-cancel-btn:hover { background: #ffffff; }
+.auth-forgot-cancel-btn:hover { background: rgba(4, 40, 95, 0.6); }
 html.dark .auth-forgot-cancel-btn:hover { background: rgba(17, 38, 70, 0.95); }
 .auth-forgot-secondary-btn {
   flex: 1;
   padding: 9px 6px;
   border-radius: 12px;
-  border: 1.5px solid rgba(190, 214, 244, 0.9);
-  background: rgba(255, 255, 255, 0.82);
-  color: #205daf;
+  border: 1.5px solid rgba(184, 220, 255, 0.62);
+  background: rgba(7, 53, 117, 0.45);
+  color: #eaf6ff;
   font-size: 14px;
   font-family: 'Times New Roman', Times, serif;
   cursor: pointer;
@@ -1319,7 +1322,7 @@ html.dark .auth-forgot-secondary-btn {
   background: rgba(14, 31, 57, 0.85);
   color: #9ec7ff;
 }
-.auth-forgot-secondary-btn:hover { background: rgba(30, 144, 255, 0.09); }
+.auth-forgot-secondary-btn:hover { background: rgba(4, 40, 95, 0.62); }
 html.dark .auth-forgot-secondary-btn:hover { background: rgba(39, 97, 184, 0.24); }
 .auth-forgot-confirm-btn {
   flex: 1;
@@ -1329,7 +1332,7 @@ html.dark .auth-forgot-secondary-btn:hover { background: rgba(39, 97, 184, 0.24)
 .auth-forgot-link {
   background: none;
   border: none;
-  color: #3a77c4;
+  color: #2f69b0;
   font-size: 12px;
   font-family: 'Times New Roman', Times, serif;
   cursor: pointer;
@@ -1353,6 +1356,18 @@ html.dark .auth-forgot-link {
 }
 html.dark .auth-forgot-link:hover {
   color: #b6d4ff;
+}
+
+.settings-password-modal {
+  background: linear-gradient(150deg, rgba(30, 144, 255, 0.97), rgba(20, 112, 210, 0.95));
+  border: 1.5px solid rgba(201, 229, 255, 0.7);
+  box-shadow: 0 20px 52px rgba(9, 58, 136, 0.44), inset 0 2px 16px rgba(190, 223, 255, 0.26);
+}
+
+html.dark .settings-password-modal {
+  background: linear-gradient(152deg, rgba(9, 20, 40, 0.97), rgba(11, 28, 54, 0.95));
+  border: 1.5px solid rgba(116, 154, 215, 0.45);
+  box-shadow: 0 22px 56px rgba(0, 0, 0, 0.52), inset 0 2px 12px rgba(109, 148, 210, 0.12);
 }
 
 /* ERROR & SUCCESS MESSAGES */

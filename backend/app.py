@@ -155,21 +155,7 @@ server_ready = False
 _BOOKS_DATASET: List[Dict[str, Any]] = []
 _AUTHOR_WEBSITE_MAP: Dict[str, str] = {}
 
-# --- OTP storage ---
-# In-memory stores with short-lived entries; replace with real SMS provider later.
-otp_store: dict[str, dict] = {}
-verified_sessions: dict[str, dict] = {}
 auth_sessions: dict[str, dict] = {}
-OTP_TTL_SECONDS = 300
-VERIFIED_SESSION_TTL_SECONDS = 600
-
-
-def _hash_otp(username: str, otp: str) -> str:
-    """Hash OTP with username + secret so raw OTP is never stored."""
-    import hashlib
-    secret = os.getenv("OTP_SECRET", os.getenv("JWT_SECRET", "smartshelf-otp-secret"))
-    payload = f"{username}:{otp}:{secret}".encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
 
 
 def _extract_bearer_token(request: Request) -> Optional[str]:
@@ -268,20 +254,17 @@ class DeleteAccountPayload(BaseModel):
     password: str
 
 
-class RequestOtpPayload(BaseModel):
-    username: str
-
-
-class VerifyOtpPayload(BaseModel):
-    username: str
-    otp: str
+class ForgotPasswordPayload(BaseModel):
+    identifier: Optional[str] = None
+    username: Optional[str] = None
+    new_password: str
 
 
 class ChangePasswordPayload(BaseModel):
     username: str
+    old_password: Optional[str] = None
     current_password: Optional[str] = None
     new_password: str
-    token: str
 
 
 class UserStateUpdatePayload(BaseModel):
@@ -1273,95 +1256,76 @@ def delete_review(review_id: str):
     _save_reviews(filtered)
     return {"status": "ok", "deleted_review_id": review_id}
 
-# ------------------------ Mock OTP + Password Change ------------------------
+# ------------------------ Direct Password Reset / Change ------------------------
 
-@app.post("/auth/request-otp")
-def request_otp(payload: RequestOtpPayload):
-    """Generate a random 6-digit OTP and store only its hash with expiry metadata."""
-    import random, time
-    username = (payload.username or "").strip().lower()
-    if not _is_valid_username(username):
-        return {"status": "error", "error": "Valid username is required"}
+def _resolve_user_for_forgot_password(identifier: Optional[str], username: Optional[str]) -> Optional[Dict[str, Any]]:
+    from services import db as db_client
+
+    normalized_username = (username or "").strip().lower()
+    normalized_identifier = (identifier or "").strip().lower()
+
+    if normalized_username:
+        return db_client.get_user_by_username(normalized_username)
+
+    if not normalized_identifier:
+        return None
+
+    if "@" in normalized_identifier:
+        return db_client.get_user_by_email(normalized_identifier) or db_client.get_user_by_username(normalized_identifier)
+    return db_client.get_user_by_username(normalized_identifier) or db_client.get_user_by_email(normalized_identifier)
+
+
+@app.post("/forgot-password")
+@app.post("/auth/forgot-password")
+def forgot_password(payload: ForgotPasswordPayload):
+    identifier = (payload.identifier or payload.username or "").strip()
+    if not identifier:
+        return {"status": "error", "error": "User identifier is required"}
+
+    pw_err = _is_valid_password(payload.new_password)
+    if pw_err:
+        return {"status": "error", "error": pw_err}
 
     try:
         from services import db as db_client
-        if not db_client.get_user_by_username(username):
-            return {"status": "error", "error": "No account exists with this username."}
-    except Exception:
-        return {"status": "error", "error": "Unable to process OTP request right now."}
+        pwd_ctx = _get_password_context()
 
-    otp = f"{random.randint(0, 999999):06d}"
-    otp_store[username] = {
-        "otp_hash": _hash_otp(username, otp),
-        "ts": time.time(),
-        "attempts": 0,
-    }
-    logger.info(f"[OTP GENERATED] Username={username} (hash stored, expires in {OTP_TTL_SECONDS}s)")
+        user = _resolve_user_for_forgot_password(identifier=identifier, username=payload.username)
+        if not user:
+            return {"status": "error", "error": "User not found"}
 
-    response = {
-        "status": "ok",
-        "message": "OTP generated. Enter it to verify.",
-    }
-    if os.getenv("DEV_UNSAFE_OTP", "0") == "1":
-        # Development-only escape hatch.
-        response["otp"] = otp
-    return response
+        normalized_username = (user.get("username") or "").strip().lower()
+        pw_hash = pwd_ctx.hash(payload.new_password)
+        if normalized_username:
+            updated = db_client.update_user_password_by_username(normalized_username, pw_hash)
+        else:
+            updated = db_client.update_user_password((user.get("email") or "").strip().lower(), pw_hash)
+        if not updated:
+            return {"status": "error", "error": "Password update failed"}
 
+        persisted = db_client.get_user_by_username(normalized_username) if normalized_username else db_client.get_user_by_email((user.get("email") or "").strip().lower())
+        if not persisted or not persisted.get("password_hash"):
+            return {"status": "error", "error": "Password update failed: no stored credentials"}
+        if not pwd_ctx.verify(payload.new_password, persisted.get("password_hash")):
+            return {"status": "error", "error": "Password update failed: verification mismatch"}
 
-@app.post("/auth/verify-otp")
-def verify_otp(payload: VerifyOtpPayload):
-    import hmac, secrets, time
-    username = (payload.username or "").strip().lower()
-    entered_otp = (payload.otp or "").strip()
-    if not username:
-        return {"status": "error", "error": "Username is required"}
-    if not entered_otp.isdigit() or len(entered_otp) != 6:
-        return {"status": "error", "error": "OTP must be a 6-digit code"}
-
-    entry = otp_store.get(username)
-    if not entry:
-        return {"status": "error", "error": "No OTP request found. Please generate a new OTP."}
-
-    if time.time() - float(entry.get("ts", 0)) > OTP_TTL_SECONDS:
-        otp_store.pop(username, None)
-        return {"status": "error", "error": "OTP expired"}
-
-    attempts = int(entry.get("attempts", 0))
-    if attempts >= 5:
-        otp_store.pop(username, None)
-        return {"status": "error", "error": "Too many invalid attempts. Please request a new OTP."}
-
-    expected_hash = str(entry.get("otp_hash", ""))
-    entered_hash = _hash_otp(username, entered_otp)
-    if not hmac.compare_digest(expected_hash, entered_hash):
-        entry["attempts"] = attempts + 1
-        return {"status": "error", "error": "Invalid OTP"}
-
-    # Mark verified by issuing a short-lived session token
-    token = secrets.token_urlsafe(24)
-    verified_sessions[token] = {"username": username, "ts": time.time()}
-    # Clear OTP so it cannot be reused
-    otp_store.pop(username, None)
-    return {"status": "ok", "token": token}
+        logger.info(f"Password updated successfully for user: {normalized_username or (user.get('email') or '').strip().lower()}")
+        return {"status": "ok", "message": "Password updated successfully"}
+    except Exception as e:
+        logger.error(f"Forgot password error: {e}")
+        return {"status": "error", "error": str(e)}
 
 
+@app.post("/change-password")
 @app.post("/auth/change-password")
 def change_password(payload: ChangePasswordPayload):
-    """Change the user's password after OTP verification.
-    Requires a valid verification token from /auth/verify-otp.
-    """
-    # Validate token exists and is fresh
-    import time
-    session = verified_sessions.get(payload.token)
-    if not session:
-        return {"status": "error", "error": "OTP verification required"}
-    if time.time() - float(session.get("ts", 0)) > VERIFIED_SESSION_TTL_SECONDS:
-        verified_sessions.pop(payload.token, None)
-        return {"status": "error", "error": "Verification session expired"}
-
     normalized_username = (payload.username or "").strip().lower()
-    if session.get("username") != normalized_username:
-        return {"status": "error", "error": "Verification token does not match this account"}
+    if not normalized_username:
+        return {"status": "error", "error": "Username is required"}
+
+    old_password = payload.old_password or payload.current_password
+    if not old_password:
+        return {"status": "error", "error": "Old password is required"}
 
     pw_err = _is_valid_password(payload.new_password)
     if pw_err:
@@ -1375,26 +1339,17 @@ def change_password(payload: ChangePasswordPayload):
         if not user:
             return {"status": "error", "error": "User not found"}
 
+        stored_hash = user.get("password_hash")
+        if not stored_hash or not pwd_ctx.verify(old_password, stored_hash):
+            return {"status": "error", "error": "Incorrect old password"}
+
         pw_hash = pwd_ctx.hash(payload.new_password)
         updated = db_client.update_user_password_by_username(normalized_username, pw_hash)
         if not updated:
             return {"status": "error", "error": "Password update failed"}
 
-        # Read-after-write verification to guarantee login will work.
-        persisted = db_client.get_user_by_username(normalized_username)
-        if not persisted or not persisted.get("password_hash"):
-            return {"status": "error", "error": "Password update failed: no stored credentials"}
-        if not pwd_ctx.verify(payload.new_password, persisted.get("password_hash")):
-            return {"status": "error", "error": "Password update failed: verification mismatch"}
-
-        # Invalidate reset state after successful change.
-        verified_sessions.pop(payload.token, None)
-        for token, info in list(verified_sessions.items()):
-            if info.get("username") == normalized_username:
-                verified_sessions.pop(token, None)
-        otp_store.pop(normalized_username, None)
-        logger.info(f"Password updated successfully for user: {normalized_username}")
-        return {"status": "ok", "message": "Password successfully updated."}
+        logger.info(f"Password changed successfully for user: {normalized_username}")
+        return {"status": "ok", "message": "Password changed successfully"}
     except Exception as e:
         logger.error(f"Change password error: {e}")
         return {"status": "error", "error": str(e)}

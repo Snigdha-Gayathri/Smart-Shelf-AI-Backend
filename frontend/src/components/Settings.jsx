@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { getApiBase } from '../utils/apiBase'
 
 const API_BASE = getApiBase()
@@ -116,6 +117,7 @@ function ToggleRow({ label, description, enabled, onToggle }) {
 
 export default function Settings({
   userId,
+  authMethod,
   theme,
   userSettings,
   onUpdateSetting,
@@ -136,22 +138,18 @@ export default function Settings({
   const fileInputRef = useRef(null)
 
   const [showPasswordModal, setShowPasswordModal] = useState(false)
-  const [passwordStep, setPasswordStep] = useState('otp')
-  const [otpInput, setOtpInput] = useState('')
-  const [otpToken, setOtpToken] = useState('')
+  const [oldPass, setOldPass] = useState('')
   const [newPass, setNewPass] = useState('')
   const [confirmPass, setConfirmPass] = useState('')
   const [pwError, setPwError] = useState('')
   const [pwInfo, setPwInfo] = useState('')
-  const [otpHelperLoading, setOtpHelperLoading] = useState(false)
-  const [demoOtp, setDemoOtp] = useState('')
-  const [currentPass, setCurrentPass] = useState('')
 
   const [editingReviewId, setEditingReviewId] = useState('')
   const [editRating, setEditRating] = useState(5)
   const [editReviewText, setEditReviewText] = useState('')
   const [confirmState, setConfirmState] = useState(null)
   const [confirmText, setConfirmText] = useState('')
+  const canChangePassword = authMethod !== 'google'
 
   const sortedReviews = useMemo(() => {
     return [...reviews].sort((a, b) => {
@@ -171,7 +169,23 @@ export default function Settings({
     else setProfilePicture(null)
   }, [profilePictureStorageKey])
 
-  const passwordRuleMessage = 'Password must contain: 8-16 characters, letters, numbers, and at least one special character.'
+  useEffect(() => {
+    if (!showPasswordModal) return undefined
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showPasswordModal])
+
+  useEffect(() => {
+    if (!canChangePassword && showPasswordModal) {
+      setShowPasswordModal(false)
+      resetPasswordFlow()
+    }
+  }, [canChangePassword, showPasswordModal])
+
+  const passwordRuleMessage = 'Password must contain: at least 8 characters, uppercase, lowercase, number, and one special character.'
 
   const updateSettingValue = (key, value) => {
     onUpdateSetting?.(key, value)
@@ -213,20 +227,17 @@ export default function Settings({
   }
 
   const resetPasswordFlow = () => {
-    setPasswordStep('otp')
-    setOtpInput('')
-    setOtpToken('')
+    setOldPass('')
     setNewPass('')
     setConfirmPass('')
     setPwError('')
     setPwInfo('')
-    setDemoOtp('')
-    setCurrentPass('')
   }
 
   const isStrongPassword = (pw) => {
-    if (!pw || pw.length < 8 || pw.length > 16) return false
-    if (!/[A-Za-z]/.test(pw)) return false
+    if (!pw || pw.length < 8) return false
+    if (!/[A-Z]/.test(pw)) return false
+    if (!/[a-z]/.test(pw)) return false
     if (!/\d/.test(pw)) return false
     if (!/[^A-Za-z0-9]/.test(pw)) return false
     return true
@@ -260,95 +271,11 @@ export default function Settings({
     setTimeout(() => setUploadMessage(''), 3000)
   }
 
-  const requestOtp = async () => {
-    setPwError('')
-    setPwInfo('')
-    setDemoOtp('')
-    if (!username) {
-      setPwError('You must be logged in to change password')
-      return
-    }
-    try {
-      const res = await fetch(`${API_BASE}/auth/request-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.trim().toLowerCase() })
-      })
-      const data = await res.json()
-      if (data.status === 'ok') {
-        if (data.otp) {
-          setDemoOtp(data.otp)
-          setPwInfo(`Demo OTP: ${data.otp}. Enter this OTP to verify.`)
-        } else {
-          setPwInfo(data.message || 'OTP generated. Enter it here to continue.')
-        }
-      } else {
-        setPwError(data.error || 'Failed to request OTP')
-      }
-    } catch {
-      setPwError('Network error requesting OTP')
-    }
-  }
-
-  const verifyOtp = async () => {
-    setPwError('')
-    setPwInfo('')
-    if (!otpInput.trim()) {
-      setPwError('OTP is required')
-      return
-    }
-    try {
-      const res = await fetch(`${API_BASE}/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: (username || '').trim().toLowerCase(), otp: otpInput.trim() })
-      })
-      const data = await res.json()
-      if (data.status === 'ok' && data.token) {
-        setOtpToken(data.token)
-        setPasswordStep('password')
-        setPwInfo('OTP verified. Set your new password and confirm it.')
-      } else {
-        setPwError(data.error || 'Invalid OTP')
-      }
-    } catch {
-      setPwError('Network error verifying OTP')
-    }
-  }
-
-  const fetchLatestOtp = async () => {
-    setPwError('')
-    setOtpHelperLoading(true)
-    try {
-      const res = await fetch(`${API_BASE}/auth/latest-otp`)
-      const data = await res.json()
-
-      if (data.status !== 'ok' || !data.has_otp) {
-        setPwError('No OTP available yet. Click Generate OTP first.')
-        return
-      }
-
-      const expected = (username || '').trim().toLowerCase()
-      const actual = (data.username || '').trim().toLowerCase()
-      if (expected && actual && expected !== actual) {
-        setPwError('Latest OTP belongs to another username. Generate OTP again for your account.')
-        return
-      }
-
-      setOtpInput(data.otp || '')
-      setPwInfo(`Latest OTP fetched: ${data.otp}`)
-    } catch {
-      setPwError('Unable to fetch latest OTP from backend')
-    } finally {
-      setOtpHelperLoading(false)
-    }
-  }
-
   const submitNewPassword = async () => {
     setPwError('')
     setPwInfo('')
-    if (!currentPass) {
-      setPwError('Current password is required')
+    if (!oldPass) {
+      setPwError('Old password is required')
       return
     }
     if (!isStrongPassword(newPass)) {
@@ -360,15 +287,17 @@ export default function Settings({
       return
     }
     try {
-      const res = await fetch(`${API_BASE}/auth/change-password`, {
+      const res = await fetch(`${API_BASE}/change-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, current_password: currentPass, new_password: newPass, token: otpToken })
+        body: JSON.stringify({ username, old_password: oldPass, new_password: newPass })
       })
       const data = await res.json()
       if (data.status === 'ok') {
-        setPasswordStep('success')
-        setPwInfo(data.message || 'Password successfully updated.')
+        setPwInfo(data.message || 'Password changed successfully')
+        setOldPass('')
+        setNewPass('')
+        setConfirmPass('')
       } else {
         setPwError(data.error || 'Failed to change password')
       }
@@ -478,16 +407,18 @@ export default function Settings({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <button
-                onClick={() => { setShowPasswordModal(true); resetPasswordFlow() }}
-                className="w-full px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm"
-              >
-                🔒 Change Password
-              </button>
+            <div className={`grid gap-3 ${canChangePassword ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+              {canChangePassword && (
+                <button
+                  onClick={() => { setShowPasswordModal(true); resetPasswordFlow() }}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm"
+                >
+                  🔒 Change Password
+                </button>
+              )}
               <button
                 onClick={onLogout}
-                className="w-full px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm"
+                className={`w-full px-4 py-3 rounded-xl bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm ${canChangePassword ? '' : 'sm:col-span-1'}`}
               >
                 🚪 Logout
               </button>
@@ -794,95 +725,52 @@ export default function Settings({
         </div>
       )}
 
-      {showPasswordModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }}>
-          <div className="glass-strong rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md p-4 sm:p-6" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg sm:text-xl font-bold text-primary dark:text-primary mb-4">Change Password</h3>
+      {canChangePassword && showPasswordModal && createPortal(
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[2000] flex items-center justify-center p-4" onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }}>
+          <div className="settings-password-modal rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-md p-4 sm:p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg sm:text-xl font-bold text-white dark:text-primary mb-4">Change Password</h3>
 
-            {passwordStep === 'otp' && (
-              <div className="space-y-4">
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Username: {username}</label>
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter OTP</label>
-                <input
-                  type="text"
-                  value={otpInput}
-                  onChange={(e) => setOtpInput(e.target.value)}
-                  maxLength={6}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
-                />
-                {demoOtp && (
-                  <div className="rounded-lg border border-emerald-300/60 bg-emerald-50 dark:bg-emerald-900/20 px-3 py-2 text-xs sm:text-sm text-emerald-700 dark:text-emerald-300">
-                    Demo OTP: {demoOtp}<br />
-                    Enter this OTP to verify.
-                  </div>
-                )}
+            <div className="space-y-4">
+              <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Old Password</label>
+              <input
+                type="password"
+                value={oldPass}
+                onChange={(e) => setOldPass(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
+              />
+              <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">New Password</label>
+              <input
+                type="password"
+                value={newPass}
+                onChange={(e) => setNewPass(e.target.value)}
+                className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border ${newPass && !isStrongPassword(newPass) ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'} bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue`}
+              />
+              {newPass && !isStrongPassword(newPass) && (
+                <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{passwordRuleMessage}</p>
+              )}
+              <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Confirm New Password</label>
+              <input
+                type="password"
+                value={confirmPass}
+                onChange={(e) => setConfirmPass(e.target.value)}
+                className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
+              />
+              {pwInfo && <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">{pwInfo}</p>}
+              {pwError && <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{pwError}</p>}
+              <div className="flex gap-3 flex-col-reverse sm:flex-row">
+                <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
                 <button
-                  onClick={fetchLatestOtp}
-                  disabled={otpHelperLoading}
-                  className="w-full text-[11px] sm:text-xs text-cool-blue hover:underline disabled:opacity-60"
+                  onClick={submitNewPassword}
+                  disabled={!oldPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)}
+                  className={`flex-1 px-4 py-2 sm:py-2.5 rounded-lg font-medium transition text-sm sm:text-base ${(!oldPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-cool-blue text-white hover:bg-cool-accent'}`}
                 >
-                  {otpHelperLoading ? 'Fetching latest OTP…' : 'Show OTP from backend (testing helper)'}
+                  Update Password
                 </button>
-                {pwInfo && <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">{pwInfo}</p>}
-                {pwError && <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{pwError}</p>}
-                <div className="flex gap-3 flex-col-reverse sm:flex-row">
-                  <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
-                  <button onClick={requestOtp} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Generate OTP</button>
-                  <button onClick={verifyOtp} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-cool-blue text-white font-medium hover:bg-cool-accent transition text-sm sm:text-base">Verify OTP</button>
-                </div>
               </div>
-            )}
-
-            {passwordStep === 'password' && (
-              <div className="space-y-4">
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Current Password</label>
-                <input
-                  type="password"
-                  value={currentPass}
-                  onChange={(e) => setCurrentPass(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
-                />
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Enter New Password</label>
-                <input
-                  type="password"
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                  className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border ${newPass && !isStrongPassword(newPass) ? 'border-red-500' : 'border-slate-300 dark:border-slate-600'} bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue`}
-                />
-                {newPass && !isStrongPassword(newPass) && (
-                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{passwordRuleMessage}</p>
-                )}
-                <label className="block text-xs sm:text-sm text-slate-700 dark:text-slate-300">Confirm New Password</label>
-                <input
-                  type="password"
-                  value={confirmPass}
-                  onChange={(e) => setConfirmPass(e.target.value)}
-                  className="w-full px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 text-sm sm:text-base focus:outline-none focus:ring-2 focus:ring-cool-blue"
-                />
-                {pwInfo && <p className="text-xs sm:text-sm text-green-600 dark:text-green-400">{pwInfo}</p>}
-                {pwError && <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{pwError}</p>}
-                <div className="flex gap-3 flex-col-reverse sm:flex-row">
-                  <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="flex-1 px-4 py-2 sm:py-2.5 rounded-lg bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition text-sm sm:text-base">Cancel</button>
-                  <button
-                    onClick={submitNewPassword}
-                    disabled={!currentPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)}
-                    className={`flex-1 px-4 py-2 sm:py-2.5 rounded-lg font-medium transition text-sm sm:text-base ${(!currentPass || !newPass || newPass !== confirmPass || !isStrongPassword(newPass)) ? 'bg-slate-300 text-slate-500 cursor-not-allowed' : 'bg-cool-blue text-white hover:bg-cool-accent'}`}
-                  >
-                    Update Password
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {passwordStep === 'success' && (
-              <div className="space-y-4 text-center">
-                <p className="text-sm sm:text-base text-green-600 dark:text-green-400 font-medium">Your password has been changed successfully.</p>
-                {pwInfo && <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300">{pwInfo}</p>}
-                <button onClick={() => { setShowPasswordModal(false); resetPasswordFlow() }} className="w-full px-4 py-2 sm:py-2.5 rounded-lg bg-cool-blue text-white font-medium hover:bg-cool-accent transition text-sm sm:text-base">Close</button>
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

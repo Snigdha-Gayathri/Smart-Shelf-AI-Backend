@@ -1,10 +1,10 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 
-/* ═══════════════════════════════════════════════════════════════
- *  Annual Wrapped — Intelligence Report Dashboard
- *  Dodger Blue (#1E90FF) theme · No Plotly · No purple
- * ═══════════════════════════════════════════════════════════════ */
+/*
+ * Annual Wrapped Intelligence Report Dashboard
+ * Dodger Blue (#1E90FF) theme - No Plotly - No purple
+ */
 
 const BLUE   = '#1E90FF'
 const GREEN  = '#06D6A0'
@@ -15,18 +15,22 @@ const ORANGE = '#F97316'
 const SLATE  = '#64748B'
 const CARD_BG     = 'rgba(15,23,42,0.65)'
 const CARD_BORDER = 'rgba(30,144,255,0.22)'
+const LIGHT_CARD_BG = 'linear-gradient(145deg, rgba(8,46,122,0.96) 0%, rgba(10,68,154,0.95) 52%, rgba(16,94,186,0.94) 100%)'
+const LIGHT_CARD_BORDER = 'rgba(186, 218, 255, 0.42)'
+const LIGHT_CARD_SHADOW = '0 18px 42px rgba(11, 66, 156, 0.38), 0 0 0 1px rgba(255, 255, 255, 0.10) inset'
+const LIGHT_HOVER_GLOW = '0 0 0 1px rgba(186, 218, 255, 0.48), 0 0 28px rgba(11,79,197,0.86), 0 0 48px rgba(8,58,152,0.72)'
 const GLOW        = `0 0 20px ${BLUE}, 0 0 40px rgba(30,144,255,0.6)`
 const GLOW_SOFT   = `0 0 14px rgba(30,144,255,0.25)`
 const PIE_COLORS  = [BLUE, GREEN, GOLD, ROSE, CYAN, ORANGE, SLATE]
 
-// ── deterministic hash ──
+// 
 function stableHash(s) {
   let h = 0
   for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0
   return Math.abs(h)
 }
 
-// ── Derive pages from genre ──
+// 
 function derivePages(book) {
   const seed = stableHash(book.title + (book.author || ''))
   const m = {
@@ -40,7 +44,7 @@ function derivePages(book) {
 }
 function deriveDays(book) { return 5 + (stableHash(book.title + (book.author || '')) % 50) }
 
-// ── Mood mapping ──
+// 
 const MOOD_MAP = {
   Dark: ['dark', 'horror', 'thriller', 'suspense', 'mystery', 'gritty', 'sinister'],
   Inspirational: ['inspirational', 'hopeful', 'uplifting', 'motivational', 'empowering', 'inspiring'],
@@ -59,7 +63,7 @@ function getMoods(tags) {
   return out
 }
 
-// ── Growth theme mapping for self-help ──
+// 
 const GROWTH_MAP = {
   Discipline: ['discipline', 'habit', 'routine', 'consistency', 'grit', 'willpower'],
   Productivity: ['productivity', 'efficiency', 'time', 'focus', 'work', 'output'],
@@ -69,7 +73,7 @@ const GROWTH_MAP = {
   Finance: ['money', 'finance', 'wealth', 'investment', 'financial', 'income'],
 }
 
-// ── Reading archetype ──
+// 
 function determineArchetype(books, likeRatio) {
   if (books.length === 0) return { title: 'Emerging Reader', desc: 'Your journey is just beginning.' }
   const gc = {}; books.forEach(b => { if (b.genre) gc[b.genre] = (gc[b.genre] || 0) + 1 })
@@ -85,16 +89,16 @@ function determineArchetype(books, likeRatio) {
   const lightTags = allTags.filter(t => ['light','fun','cozy','wholesome','humorous'].some(k => t.includes(k))).length
 
   if (hasPsych && likeRatio > 70) return { title: 'The Deep Thinker', desc: `You gravitate toward psychologically rich reads that challenge conventional thinking. Your ${topGenre} focus reveals a mind that seeks to understand the deeper layers of human behavior and society.` }
-  if (hasFiction && diverse) return { title: 'The Narrative Strategist', desc: `With a broad fiction palette spanning ${Object.keys(gc).length} genres, you approach stories strategically — extracting meaning from diverse narratives. You don't just read; you analyze.` }
+  if (hasFiction && diverse) return { title: 'The Narrative Strategist', desc: `With a broad fiction palette spanning ${Object.keys(gc).length} genres, you approach stories strategically, extracting meaning from diverse narratives. You do not just read; you analyze.` }
   if (hasSH && hasEdu) return { title: 'The Growth Architect', desc: 'Your reading is a deliberate investment in personal evolution. By balancing self-help with educational material, you are systematically designing your intellectual and emotional growth.' }
   if (hasFiction && darkTags > lightTags) return { title: 'The Escapist Explorer', desc: 'You immerse yourself in intense, emotionally charged fiction. Your preference for darker, gripping narratives suggests a reader who seeks adventure in the shadows of storytelling.' }
-  if (diverse && likeRatio > 75) return { title: 'The Reflective Polymath', desc: 'With exceptional genre diversity and a high satisfaction rate, you are a true intellectual omnivore — equally at home in fiction, philosophy, and practical knowledge.' }
+  if (diverse && likeRatio > 75) return { title: 'The Reflective Polymath', desc: 'With exceptional genre diversity and a high satisfaction rate, you are a true intellectual omnivore, equally at home in fiction, philosophy, and practical knowledge.' }
   if (hasSH) return { title: 'The Growth Architect', desc: 'Your reading choices reveal a clear mission: systematic self-improvement. Each book is a building block in your personal development architecture.' }
   if (hasEdu) return { title: 'The Knowledge Seeker', desc: 'You pursue learning with purpose. Your educational reading density shows a reader committed to mastery and deep understanding across multiple domains.' }
   return { title: 'The Curious Mind', desc: 'Your reading patterns reveal genuine intellectual curiosity. You explore diverse topics and genres, driven by a desire to understand the world from multiple perspectives.' }
 }
 
-// ── AI summary generator ──
+//
 function generateAISummary(books, aw) {
   if (!aw || aw.totalBooksRead === 0) return ''
   const total = aw.totalBooksRead
@@ -119,7 +123,7 @@ function generateAISummary(books, aw) {
   return s
 }
 
-// ── SVG arc helpers ──
+//
 function polar(cx, cy, r, deg) { const rad = (deg - 90) * Math.PI / 180; return { x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) } }
 function pieSlice(cx, cy, r, s, e) {
   if (e - s >= 359.99) return `M ${cx - r} ${cy} A ${r} ${r} 0 1 1 ${cx + r} ${cy} A ${r} ${r} 0 1 1 ${cx - r} ${cy} Z`
@@ -164,30 +168,46 @@ function clampPercent(value) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
 
-/* ══════════════════════════════════════════════════════════════
- *  MAIN COMPONENT
- * ══════════════════════════════════════════════════════════════ */
-export default function Dashboard({ personalityProfile, annualWrapped, previousReads = [], educationalBooks = [], reviewInsights = {} }) {
-  // ── Month names constant (used in multiple useMemo hooks) ──
+
+export default function Dashboard({ personalityProfile, annualWrapped, previousReads = [], educationalBooks = [], reviewInsights = {}, theme = 'light' }) {
+  const isDarkMode = theme === 'dark'
+  const primaryBlue = isDarkMode ? BLUE : '#0B4FC5'
+  const cardHover = isDarkMode ? undefined : { boxShadow: LIGHT_HOVER_GLOW, scale: 1.005 }
+  const subtleTextColor = isDarkMode ? '#94A3B8' : '#DCEBFF'
+  const strongTextColor = isDarkMode ? '#FFFFFF' : '#F8FBFF'
+  const brightNumberStyle = isDarkMode
+    ? undefined
+    : { color: '#8FDBFF', textShadow: '0 0 10px rgba(143,219,255,0.95), 0 0 22px rgba(32,159,255,0.8)' }
+  const analyticsCardStyle = isDarkMode
+    ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }
+    : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(16px)' }
+  // Month names constant (used in multiple useMemo hooks)
   const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
-  // ── All year books (merged) ──
+  // All year books (merged)
   const yearBooks = useMemo(() => {
     const year = new Date().getFullYear()
     const compEdu = educationalBooks.filter(b => b.eduStatus === 'completed' && b.completedAt).map(b => ({ ...b, finishedAt: b.completedAt, liked: true }))
     return [...previousReads, ...compEdu].filter(b => b.finishedAt && new Date(b.finishedAt).getFullYear() === year)
   }, [previousReads, educationalBooks])
 
-  // ── Enriched books (with derived pages, days) ──
+  // Enriched books (with derived pages and days)
   const enriched = useMemo(() => yearBooks.map(b => ({ ...b, pages: derivePages(b), days: deriveDays(b) })), [yearBooks])
 
-  // ── Like ratio ──
+  // Like ratio
   const likeRatio = useMemo(() => {
     const { liked = 0, disliked = 0 } = annualWrapped?.likeDislikeRatio || {}
     return liked + disliked > 0 ? Math.round((liked / (liked + disliked)) * 100) : 0
   }, [annualWrapped])
 
-  // ── Genre pie data (top 6 + Others) ──
+  // Average rating summary card metric
+  const averageRating = useMemo(() => {
+    if (enriched.length === 0) return 0
+    const sum = enriched.reduce((acc, book) => acc + normalizeRating(book), 0)
+    return Math.round((sum / enriched.length) * 10) / 10
+  }, [enriched])
+
+  // Genre pie data (top 6 + Others)
   const pieData = useMemo(() => {
     const gd = annualWrapped?.genreDistribution || {}
     const sorted = Object.entries(gd).sort((a, b) => b[1] - a[1])
@@ -198,13 +218,13 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
   }, [annualWrapped])
   const totalForPie = useMemo(() => annualWrapped?.totalBooksRead || 0, [annualWrapped])
 
-  // ── Archetype ──
+  // Archetype
   const archetype = useMemo(() => determineArchetype(yearBooks, likeRatio), [yearBooks, likeRatio])
 
-  // ── AI Summary ──
+  // AI Summary
   const aiSummary = useMemo(() => generateAISummary(yearBooks, annualWrapped), [yearBooks, annualWrapped])
 
-  // ── Author Diversity ──
+  // Author diversity
   const authorStats = useMemo(() => {
     const authors = new Set(yearBooks.map(b => b.author).filter(Boolean))
     const ac = {}; yearBooks.forEach(b => { if (b.author) ac[b.author] = (ac[b.author] || 0) + 1 })
@@ -212,14 +232,14 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return { unique: authors.size, total: yearBooks.length, topAuthor: topAuthor?.[0] || 'N/A', topCount: topAuthor?.[1] || 0 }
   }, [yearBooks])
 
-  // ── Consistency score ──
+  // GG Consistency score GG
   const consistency = useMemo(() => {
     const mr = annualWrapped?.monthlyReads || {}
     const active = Object.values(mr).filter(c => c > 0).length
     return Math.round((active / 12) * 100)
   }, [annualWrapped])
 
-  // ── Mood consistency score from month-wise mood variance ──
+  // GG Mood consistency score from month-wise mood variance GG
   const moodConsistency = useMemo(() => {
     const moodKeys = Object.keys(MOOD_MAP)
     const byMonth = {}
@@ -292,14 +312,14 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return { score, level: 'Low', subtitle: 'Highly dynamic mood shifts' }
   }, [enriched])
 
-  // ── Fiction immersion hours ──
+  // GG Fiction immersion hours GG
   const fictionHours = useMemo(() => {
     const fBooks = enriched.filter(b => (b.type || 'fiction') === 'fiction')
     const totalPages = fBooks.reduce((s, b) => s + b.pages, 0)
     return Math.round(totalPages / 40)
   }, [enriched])
 
-  // ── Self-help growth focus ──
+  // GG Self-help growth focus GG
   const selfHelpFocus = useMemo(() => {
     const shBooks = enriched.filter(b => b.type === 'self-help')
     if (shBooks.length === 0) return null
@@ -319,21 +339,21 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return Object.entries(themeCounts).sort((a, b) => b[1] - a[1])[0][0]
   }, [enriched])
 
-  // ── Fastest vs Longest read ──
+  // GG Fastest vs Longest read GG
   const fastSlow = useMemo(() => {
     if (enriched.length < 2) return null
     const sorted = [...enriched].sort((a, b) => a.days - b.days)
     return { fastest: sorted[0], slowest: sorted[sorted.length - 1] }
   }, [enriched])
 
-  // ── Monthly momentum (books per month) ──
+  // GG Monthly momentum (books per month) GG
   const monthlyData = useMemo(() => {
     const mr = annualWrapped?.monthlyReads || {}
     return monthNames.map(m => ({ month: m, count: mr[m] || 0 }))
   }, [annualWrapped])
   const peakCount = useMemo(() => Math.max(...monthlyData.map(m => m.count), 1), [monthlyData])
 
-  // ── Reading depth per month ──
+  // GG Reading depth per month GG
   const depthCurve = useMemo(() => {
     const byMonth = {}
     enriched.forEach(b => {
@@ -352,7 +372,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
   }, [enriched])
   const maxDepth = useMemo(() => Math.max(...depthCurve.map(d => d.depth), 1), [depthCurve])
 
-  // ── Emotional journey heatmap ──
+  // GG Emotional journey heatmap GG
   const emotionGrid = useMemo(() => {
     const cats = Object.keys(MOOD_MAP)
     const grid = {}
@@ -371,7 +391,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return { grid, cats, maxVal: maxVal || 1 }
   }, [enriched])
 
-  // ── Like interpretation ──
+  // GG Like interpretation GG
   const likeInterpretation = useMemo(() => {
     if (likeRatio >= 90) return 'Your reading choices were almost perfectly aligned with your interests.'
     if (likeRatio >= 75) return 'Your reading choices were strongly aligned with your interests.'
@@ -380,10 +400,10 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return 'You took bold risks with experimental reading choices.'
   }, [likeRatio])
 
-  // ── Consistency interpretation ──
+  // GG Consistency interpretation GG
   const consistencyLabel = consistency >= 80 ? 'You maintained excellent reading discipline.' : consistency >= 60 ? 'You maintained strong reading discipline.' : consistency >= 40 ? 'You had moderate reading regularity.' : 'You read in concentrated bursts.'
 
-  // ── Reader evolution timeline by quarter ──
+  // GG Reader evolution timeline by quarter GG
   const evolutionTimeline = useMemo(() => {
     const quarters = [
       { id: 'Q1', label: 'Jan-Mar', months: [0, 1, 2] },
@@ -423,7 +443,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     })
   }, [yearBooks])
 
-  // ── Reading DNA metrics ──
+  // GG Reading DNA metrics GG
   const readingDNA = useMemo(() => {
     const gd = annualWrapped?.genreDistribution || {}
     const tags = yearBooks.flatMap((b) => (b.emotion_tags || b.tags || []).map((t) => String(t).toLowerCase()))
@@ -457,7 +477,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     ]
   }, [annualWrapped, yearBooks, likeRatio])
 
-  // ── Hidden taste (low-frequency, high-rating genre) ──
+  // GG Hidden taste (low-frequency, high-rating genre) GG
   const hiddenTaste = useMemo(() => {
     if (!yearBooks.length) return null
     const byGenre = {}
@@ -489,7 +509,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     }
   }, [yearBooks])
 
-  // ── Recommendation confidence score ──
+  // GG Recommendation confidence score GG
   const recommendationConfidence = useMemo(() => {
     const sortedGenres = Object.entries(annualWrapped?.genreDistribution || {}).sort((a, b) => b[1] - a[1])
     const topGenre = sortedGenres[0]?.[0] || 'mixed'
@@ -503,7 +523,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return { score, topGenre, summary }
   }, [annualWrapped, likeRatio])
 
-  // ── Reading universe clusters ──
+  // GG Reading universe clusters GG
   const universeClusters = useMemo(() => {
     const clusterRules = {
       'Romance Cluster': ['romance', 'love', 'contemporary romance'],
@@ -538,7 +558,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
       .sort((a, b) => b.value - a.value)
   }, [annualWrapped])
 
-  // ── Rarest discovery ──
+  // GG Rarest discovery GG
   const rarestDiscovery = useMemo(() => {
     if (!yearBooks.length) return null
     const genreCount = {}
@@ -562,7 +582,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return scored.sort((a, b) => a.popularityScore - b.popularityScore)[0]
   }, [yearBooks])
 
-  // ── AI reflection + forecast ──
+  // GG AI reflection + forecast GG
   const aiReflection = useMemo(() => {
     const topGenres = Object.entries(annualWrapped?.genreDistribution || {}).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => titleCase(g))
     const moodTotals = {}
@@ -593,21 +613,21 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
       {
         key: 'predictionAlignment',
         title: 'Prediction Alignment',
-        icon: '🎯',
+        icon: '=',
         color: BLUE,
         metric: annualWrapped.predictionAlignment,
       },
       {
         key: 'preferenceStability',
         title: 'Preference Stability',
-        icon: '🧭',
+        icon: '=',
         color: GREEN,
         metric: annualWrapped.preferenceStability,
       },
       {
         key: 'explorationProfile',
         title: 'Exploration Profile',
-        icon: '🧪',
+        icon: '=',
         color: GOLD,
         metric: annualWrapped.explorationProfile,
       },
@@ -616,14 +636,14 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     return metrics.filter((entry) => entry.metric && typeof entry.metric === 'object')
   }, [annualWrapped])
 
-  // ── EMPTY STATE ──
+  // GG EMPTY STATE GG
   if (!annualWrapped || annualWrapped.totalBooksRead === 0) {
     return (
       <div className="w-full flex items-center justify-center py-20">
         <motion.div initial={{ opacity: 0, scale: 0.92 }} animate={{ opacity: 1, scale: 1 }}
           className="text-center p-10 rounded-2xl max-w-md"
           style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <div className="text-5xl mb-5">📊</div>
+          <div className="text-5xl mb-5">R</div>
           <p className="text-sm sm:text-base text-slate-300 leading-relaxed">No reading data yet. Start reading and rating books to unlock your annual intelligence report.</p>
           <div className="mt-5 h-0.5 w-28 mx-auto rounded-full" style={{ background: `linear-gradient(90deg, transparent, ${BLUE}80, transparent)` }} />
         </motion.div>
@@ -631,27 +651,27 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
     )
   }
 
-  // ─────────────────────────────────────────────────────────────
+  // GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG
   return (
     <div className="w-full space-y-6 sm:space-y-8">
 
-      {/* ════════ AI SUMMARY ════════ */}
+      {/* AI SUMMARY */}
       {aiSummary && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-          className="p-5 sm:p-7 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} whileHover={cardHover}
+          className="p-5 sm:p-7 rounded-2xl" style={analyticsCardStyle}>
           <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 mb-3">
-            <span style={{ color: BLUE }}>◈</span> 🧠 AI Reading Intelligence Summary
+            <span style={{ color: BLUE }}>*</span> AI Reading Intelligence Summary
           </h3>
           <p className="text-sm sm:text-base text-slate-200 leading-relaxed">{aiSummary}</p>
         </motion.div>
       )}
 
-      {/* ════════ REVIEW INTELLIGENCE INSIGHTS ════════ */}
+      {/* REVIEW INTELLIGENCE INSIGHTS */}
       {(reviewInsights?.topDetectedThemes?.length > 0 || reviewInsights?.preferredStorytellingStyle?.length > 0) && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }}
-          className="p-5 sm:p-7 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.08 }} whileHover={cardHover}
+          className="p-5 sm:p-7 rounded-2xl" style={analyticsCardStyle}>
           <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 mb-3">
-            <span style={{ color: BLUE }}>◈</span> 📝 Review Intelligence Insights
+            <span style={{ color: BLUE }}>*</span> Insights: Review Intelligence
           </h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -674,7 +694,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
               <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">Preferred storytelling style</p>
               <ul className="space-y-1">
                 {(reviewInsights?.preferredStorytellingStyle || []).slice(0, 4).map((style) => (
-                  <li key={style} className="text-sm text-slate-200">• {style}</li>
+                  <li key={style} className="text-sm text-slate-200">- {style}</li>
                 ))}
               </ul>
             </div>
@@ -724,26 +744,25 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       )}
 
-      {/* ════════ STATS GRID (4 cards) ════════ */}
+      {/* STATS GRID */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <StatCard label="Books Read" value={annualWrapped.totalBooksRead} sub="this year" icon="📚" color={BLUE} delay={0} />
-        {annualWrapped.educationalCompleted > 0 && (
-          <StatCard label="Educational" value={annualWrapped.educationalCompleted} sub="completed" icon="🎓" color={CYAN} delay={0.08} />
-        )}
-        <StatCard label="Like Ratio" value={`${likeRatio}%`} sub="positive reads" icon="👍" color={GREEN} delay={0.16} />
-        <StatCard label="Consistency" value={`${consistency}%`} sub={consistencyLabel} icon="📈" color={GOLD} delay={0.24} />
+        <StatCard theme={theme} label="Books Read" value={annualWrapped.totalBooksRead} sub="this year" icon="📚" color={BLUE} delay={0} />
+        <StatCard theme={theme} label="Like Ratio" value={`${likeRatio}%`} sub="positive reads" icon="👍" color={GREEN} delay={0.08} />
+        <StatCard theme={theme} label="Consistency" value={`${consistency}%`} sub={consistencyLabel} icon="📈" color={GOLD} delay={0.16} />
+        <StatCard theme={theme} label="Avg Rating" value={`${averageRating.toFixed(1)}/5`} sub="reader sentiment" icon="⭐" color={CYAN} delay={0.24} />
       </div>
 
-      {/* ════════ BACKEND ANALYTICS (NEW) ════════ */}
+      {/* BACKEND ANALYTICS */}
       {advancedMetrics.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.28 }}
           className="p-5 sm:p-6 rounded-2xl"
-          style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}
+          style={analyticsCardStyle}
+          whileHover={cardHover}
         >
-          <Heading icon="🧠" title="Advanced Annual Analytics" />
+          <Heading icon="A" title="Advanced Annual Analytics" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 mt-4">
             {advancedMetrics.map((entry, idx) => {
               const rawScore = Number(entry.metric?.score)
@@ -751,6 +770,22 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
               const scorePercent = Math.round(safeScore * 100)
               const label = entry.metric?.label || 'N/A'
               const context = Array.isArray(entry.metric?.context) ? entry.metric.context.filter(Boolean) : []
+              const titleLower = String(entry.title || '').toLowerCase()
+              const analyticsEmoji = titleLower.includes('prediction')
+                ? '🔮'
+                : titleLower.includes('preference')
+                  ? '🧭'
+                  : titleLower.includes('exploration')
+                    ? '🛰️'
+                    : '📊'
+              const analyticsItemStyle = isDarkMode
+                ? { border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)' }
+                : {
+                    border: '1px solid rgba(186, 218, 255, 0.34)',
+                    background: 'linear-gradient(150deg, rgba(30, 144, 255, 0.33), rgba(20, 96, 198, 0.28))',
+                    backdropFilter: 'blur(14px)',
+                    boxShadow: '0 8px 24px rgba(9, 58, 142, 0.28)',
+                  }
 
               return (
                 <motion.div
@@ -758,14 +793,15 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.32 + idx * 0.06 }}
-                  className="rounded-xl border border-white/10 bg-white/5 p-4"
+                  className="rounded-xl p-4"
+                  style={analyticsItemStyle}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs uppercase tracking-wide text-slate-400">{entry.title}</p>
-                    <span className="text-base">{entry.icon}</span>
+                    <p className="text-xs uppercase tracking-wide" style={{ color: subtleTextColor }}>{entry.title}</p>
+                    <span className="text-base">{analyticsEmoji}</span>
                   </div>
                   <div className="flex items-end gap-2 mb-2">
-                    <span className="text-2xl font-black text-white">{scorePercent}%</span>
+                    <span className="text-2xl font-black" style={{ color: strongTextColor }}>{scorePercent}%</span>
                     <span className="text-xs font-semibold" style={{ color: entry.color }}>{label}</span>
                   </div>
                   <div className="h-2 w-full rounded-full bg-white/10 overflow-hidden mb-2">
@@ -775,7 +811,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
                     />
                   </div>
                   {context.length > 0 && (
-                    <p className="text-[11px] text-slate-300 leading-relaxed">{context[0]}</p>
+                    <p className="text-[11px] leading-relaxed" style={{ color: subtleTextColor }}>{context[0]}</p>
                   )}
                 </motion.div>
               )
@@ -784,15 +820,15 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       )}
 
-      {/* ════════ TYPE BREAKDOWN BAR ════════ */}
+      {/* TYPE BREAKDOWN BAR */}
       {annualWrapped.typeBreakdown && Object.keys(annualWrapped.typeBreakdown).length > 1 && (
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="📖" title="Reading Breakdown by Type" />
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} whileHover={cardHover}
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="T" title="Reading Breakdown by Type" />
           <div className="flex rounded-full overflow-hidden h-5 sm:h-6 mt-4">
             {Object.entries(annualWrapped.typeBreakdown).map(([type, count], i) => {
               const pct = Math.round((count / annualWrapped.totalBooksRead) * 100)
-              const c = { fiction: BLUE, 'self-help': GOLD, educational: GREEN }[type] || SLATE
+              const c = { fiction: primaryBlue, 'self-help': GOLD, educational: GREEN }[type] || SLATE
               return (
                 <motion.div key={type} initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ delay: 0.4 + i * 0.1, duration: 0.7 }}
                   className="flex items-center justify-center text-[10px] sm:text-xs font-bold text-white"
@@ -805,14 +841,14 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
           </div>
           <div className="flex flex-wrap gap-4 mt-3">
             {Object.entries(annualWrapped.typeBreakdown).map(([type, count]) => {
-              const c = { fiction: BLUE, 'self-help': GOLD, educational: GREEN }[type] || SLATE
+              const c = { fiction: primaryBlue, 'self-help': GOLD, educational: GREEN }[type] || SLATE
               return <LegendDot key={type} color={c} label={`${type}: ${count}`} />
             })}
           </div>
         </motion.div>
       )}
 
-      {/* ════════ READING ARCHETYPE ════════ */}
+      {/* READING ARCHETYPE */}
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}
         className="p-6 sm:p-8 rounded-2xl text-center" style={{ background: `linear-gradient(135deg, ${BLUE}12, ${GREEN}08)`, border: `2px solid ${BLUE}`, boxShadow: GLOW }}>
         <p className="text-[10px] sm:text-xs uppercase tracking-[0.2em] font-semibold mb-3" style={{ color: `${BLUE}CC` }}>Your {new Date().getFullYear()} Reading Archetype</p>
@@ -823,14 +859,14 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         <p className="text-sm sm:text-base text-slate-300 leading-relaxed max-w-2xl mx-auto">{archetype.desc}</p>
       </motion.div>
 
-      {/* ════════ GENRE PIE + LIKE DONUT ════════ */}
+      {/* GENRE PIE + LIKE DONUT */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
 
         {/* Genre Distribution Pie */}
         {pieData.length > 0 && (
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-            className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-            <Heading icon="📊" title="Genre Distribution" />
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} whileHover={cardHover}
+            className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+            <Heading icon="G" title="Genre Distribution" />
             <div className="flex justify-center mt-4">
               <svg width="220" height="220" viewBox="0 0 220 220">
                 {(() => {
@@ -872,9 +908,9 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
 
         {/* Like vs Dislike Donut */}
         {annualWrapped.likeDislikeRatio && (annualWrapped.likeDislikeRatio.liked + annualWrapped.likeDislikeRatio.disliked) > 0 && (
-          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}
-            className="p-5 sm:p-6 rounded-2xl flex flex-col items-center" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-            <Heading icon="👍" title="Like vs Dislike Ratio" />
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }} whileHover={cardHover}
+            className="p-5 sm:p-6 rounded-2xl flex flex-col items-center" style={analyticsCardStyle}>
+            <Heading icon="R" title="Like vs Dislike Ratio" />
             <div className="relative mt-4">
               <svg width="220" height="220" viewBox="0 0 220 220">
                 {(() => {
@@ -897,7 +933,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
               </svg>
               {/* Center insight */}
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <AnimatedNumber value={likeRatio} className="text-3xl font-black text-white" suffix="%" />
+                <AnimatedNumber value={likeRatio} className="text-3xl font-black" suffix="%" styleOverride={brightNumberStyle} />
                 <span className="text-[10px] text-slate-400 mt-0.5">Positive Reads</span>
               </div>
             </div>
@@ -910,37 +946,37 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         )}
       </div>
 
-      {/* ════════ DEPTH CURVE + EMOTIONAL HEATMAP ════════ */}
+      {/* DEPTH CURVE + EMOTIONAL HEATMAP */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
 
         {/* Intellectual Depth Curve */}
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🔥" title="Intellectual Intensity Curve" />
+          <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }} whileHover={cardHover}
+            className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="I" title="Intellectual Intensity Curve" />
           <div className="mt-5 relative" style={{ height: '180px' }}>
             <svg width="100%" height="180" viewBox="0 0 360 180" preserveAspectRatio="none">
               {/* Grid lines */}
               {[0.25, 0.5, 0.75].map(f => (
-                <line key={f} x1="0" y1={180 - f * 160} x2="360" y2={180 - f * 160} stroke={`${BLUE}12`} strokeWidth="1" />
+                <line key={f} x1="0" y1={180 - f * 160} x2="360" y2={180 - f * 160} stroke={`${primaryBlue}16`} strokeWidth="1" />
               ))}
               {/* Area fill */}
               <motion.path
                 d={`M ${depthCurve.map((d, i) => `${i * (360 / 11)} ${180 - (d.depth / maxDepth) * 155}`).join(' L ')} L ${11 * (360 / 11)} 180 L 0 180 Z`}
-                fill={`${BLUE}15`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7, duration: 0.8 }}
+                fill={`${primaryBlue}1A`} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7, duration: 0.8 }}
               />
               {/* Line */}
               <motion.polyline
                 points={depthCurve.map((d, i) => `${i * (360 / 11)},${180 - (d.depth / maxDepth) * 155}`).join(' ')}
-                fill="none" stroke={BLUE} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                fill="none" stroke={primaryBlue} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
                 initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ delay: 0.6, duration: 1.2 }}
-                style={{ filter: `drop-shadow(0 0 6px ${BLUE})` }}
+                style={{ filter: `drop-shadow(0 0 6px ${primaryBlue})` }}
               />
               {/* Dots */}
               {depthCurve.map((d, i) => d.depth > 0 && (
                 <motion.circle key={i} cx={i * (360 / 11)} cy={180 - (d.depth / maxDepth) * 155} r="4"
-                  fill={BLUE} stroke="#fff" strokeWidth="1.5"
+                  fill={primaryBlue} stroke="#fff" strokeWidth="1.5"
                   initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ delay: 0.8 + i * 0.04, type: 'spring' }}
-                  style={{ filter: `drop-shadow(0 0 4px ${BLUE})` }} />
+                  style={{ filter: `drop-shadow(0 0 4px ${primaryBlue})` }} />
               ))}
             </svg>
             {/* Month labels */}
@@ -951,9 +987,9 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
 
         {/* Emotional Journey Heatmap */}
-        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="💓" title="Emotional Reading Journey" />
+        <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} whileHover={cardHover}
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="J" title="Emotional Reading Journey" />
           <div className="mt-5 overflow-x-auto">
             <div className="min-w-[360px]">
               {/* Month headers */}
@@ -972,10 +1008,10 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
                         <motion.div key={m} initial={{ scale: 0 }} animate={{ scale: 1 }}
                           transition={{ delay: 0.7 + Math.random() * 0.3 }}
                           className="flex-1 h-5 sm:h-6 rounded-sm cursor-default"
-                          title={`${cat} · ${m}: ${val}`}
+                          title={`${cat} - ${m}: ${val}`}
                           style={{
-                            background: val > 0 ? `rgba(30,144,255,${0.15 + intensity * 0.7})` : 'rgba(30,144,255,0.04)',
-                            boxShadow: val > 0 ? `0 0 ${intensity * 8}px rgba(30,144,255,${intensity * 0.4})` : 'none',
+                            background: val > 0 ? `rgba(${isDarkMode ? '30,144,255' : '11,79,197'},${0.18 + intensity * 0.72})` : `rgba(${isDarkMode ? '30,144,255' : '11,79,197'},0.06)`,
+                            boxShadow: val > 0 ? `0 0 ${intensity * 8}px rgba(${isDarkMode ? '30,144,255' : '11,79,197'},${intensity * 0.45})` : 'none',
                           }}
                         />
                       )
@@ -988,81 +1024,108 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       </div>
 
-      {/* ════════ INTEL CARDS ROW ════════ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Author Diversity */}
-        <GlowCard delay={0.6}>
-          <div className="text-center">
-            <div className="text-lg mb-1">🌍</div>
-            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${BLUE}CC` }}>Author Diversity</div>
-            <AnimatedNumber value={authorStats.unique} className="text-3xl sm:text-4xl font-black text-white" />
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">unique authors</p>
-            {authorStats.topCount > 1 && <p className="text-[8px] text-slate-500 mt-0.5">Top: {authorStats.topAuthor} ({authorStats.topCount})</p>}
-          </div>
-        </GlowCard>
+      {/* INTEL CARDS */}
+      <div className="space-y-3 sm:space-y-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          {/* Author Diversity */}
+          <GlowCard theme={theme} delay={0.6}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">👥</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${BLUE}CC` }}>Author Diversity</div>
+              <AnimatedNumber value={authorStats.unique} className="text-3xl sm:text-4xl font-black" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">unique authors</p>
+              {authorStats.topCount > 1 && <p className="text-[8px] text-slate-500 mt-0.5">Top: {authorStats.topAuthor} ({authorStats.topCount})</p>}
+            </div>
+          </GlowCard>
 
-        {/* Fiction Immersion */}
-        <GlowCard delay={0.68}>
-          <div className="text-center">
-            <div className="text-lg mb-1">📕</div>
-            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${GREEN}CC` }}>Fiction Immersion</div>
-            <AnimatedNumber value={fictionHours} className="text-3xl sm:text-4xl font-black text-white" suffix="h" />
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">in fictional worlds</p>
-          </div>
-        </GlowCard>
+          {/* Fiction Immersion */}
+          <GlowCard theme={theme} delay={0.68}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">📚</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${GREEN}CC` }}>Fiction Immersion</div>
+              <AnimatedNumber value={fictionHours} className="text-3xl sm:text-4xl font-black" suffix="h" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">in fictional worlds</p>
+            </div>
+          </GlowCard>
 
-        {/* Mood Consistency */}
-        <GlowCard delay={0.74}>
-          <div className="text-center">
-            <div className="text-lg mb-1">🎭</div>
-            <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${CYAN}CC` }}>Mood Consistency</div>
-            <AnimatedNumber value={moodConsistency.score} className="text-3xl sm:text-4xl font-black text-white" suffix="%" />
-            <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">{moodConsistency.subtitle}</p>
-          </div>
-        </GlowCard>
+          {/* Mood Consistency */}
+          <GlowCard theme={theme} delay={0.74}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">🎭</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${CYAN}CC` }}>Mood Consistency</div>
+              <AnimatedNumber value={moodConsistency.score} className="text-3xl sm:text-4xl font-black" suffix="%" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">{moodConsistency.subtitle}</p>
+            </div>
+          </GlowCard>
 
-        {/* Self-Help Focus */}
-        {selfHelpFocus && (
-          <GlowCard delay={0.76}>
+          {/* Growth Focus */}
+          <GlowCard theme={theme} delay={0.76}>
             <div className="text-center flex flex-col items-center justify-center h-full">
-              <div className="text-lg mb-1">💪</div>
+              <div className="text-2xl mb-2">🚀</div>
               <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-2" style={{ color: `${GOLD}CC` }}>Growth Focus</div>
               <motion.div initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.9, type: 'spring' }}
                 className="px-3 py-1.5 rounded-full text-xs sm:text-sm font-bold"
                 style={{ background: `${GOLD}20`, border: `2px solid ${GOLD}`, color: '#fff', boxShadow: `0 0 16px ${GOLD}40` }}>
-                {selfHelpFocus}
+                {selfHelpFocus || 'Emerging Focus'}
               </motion.div>
               <p className="text-[8px] text-slate-500 mt-2">{new Date().getFullYear()} growth theme</p>
             </div>
           </GlowCard>
-        )}
+        </div>
 
-        {/* Fastest vs Longest */}
-        {fastSlow && (
-          <GlowCard delay={0.84}>
+        {/* Reading Velocity + 3 New Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <GlowCard theme={theme} delay={0.84}>
             <div className="text-center w-full space-y-2">
-              <div className="text-lg mb-1">🎯</div>
-              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold" style={{ color: `${ROSE}CC` }}>Speed Range</div>
+              <div className="text-2xl mb-2">⚡</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold" style={{ color: `${ORANGE}CC` }}>Reading Velocity</div>
               <div className="space-y-1.5 mt-2">
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className="text-slate-400">⚡ Fastest</span>
-                  <span className="font-bold text-white truncate max-w-[80px]" title={fastSlow.fastest.title}>{fastSlow.fastest.days}d</span>
+                  <span className="text-slate-400">Fastest</span>
+                  <span className="font-bold text-white truncate max-w-[80px]" title={fastSlow?.fastest?.title || 'N/A'}>{fastSlow?.fastest?.days ?? 0}d</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 text-[10px]">
-                  <span className="text-slate-400">🐢 Longest</span>
-                  <span className="font-bold text-white truncate max-w-[80px]" title={fastSlow.slowest.title}>{fastSlow.slowest.days}d</span>
+                  <span className="text-slate-400">Longest</span>
+                  <span className="font-bold text-white truncate max-w-[80px]" title={fastSlow?.slowest?.title || 'N/A'}>{fastSlow?.slowest?.days ?? 0}d</span>
                 </div>
               </div>
-              <p className="text-[8px] text-slate-500 truncate" title={fastSlow.fastest.title}>⚡ {fastSlow.fastest.title}</p>
+              <p className="text-[8px] text-slate-500 truncate" title={fastSlow?.fastest?.title || 'N/A'}>{fastSlow?.fastest?.title || 'No completed books yet'}</p>
             </div>
           </GlowCard>
-        )}
+
+          <GlowCard theme={theme} delay={0.9}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">📖</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: '#FFD166CC' }}>Reading Pace</div>
+              <AnimatedNumber value={enriched.length > 0 ? Math.round(365 / enriched.length) : 0} className="text-3xl sm:text-4xl font-black" suffix="d" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">per book avg</p>
+            </div>
+          </GlowCard>
+
+          <GlowCard theme={theme} delay={0.96}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">🎨</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: '#5EEAD4CC' }}>Genre Diversity</div>
+              <AnimatedNumber value={Object.keys(annualWrapped?.genreDistribution || {}).length} className="text-3xl sm:text-4xl font-black" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">genres explored</p>
+            </div>
+          </GlowCard>
+
+          <GlowCard theme={theme} delay={1.02}>
+            <div className="text-center">
+              <div className="text-2xl mb-2">💫</div>
+              <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: '#EF476FCC' }}>Emotional Spectrum</div>
+              <AnimatedNumber value={Object.keys(MOOD_MAP).length} className="text-3xl sm:text-4xl font-black" styleOverride={brightNumberStyle} />
+              <p className="text-[9px] sm:text-[10px] text-slate-400 mt-1">moods experienced</p>
+            </div>
+          </GlowCard>
+        </div>
       </div>
 
-      {/* ════════ READING MOMENTUM ════════ */}
-      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }}
-        className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-        <Heading icon="⚡" title="Reading Momentum" />
+      {/* READING MOMENTUM */}
+      <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.65 }} whileHover={cardHover}
+        className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+        <Heading icon="M" title="Reading Momentum" />
         <div className="flex items-end gap-1.5 sm:gap-2 mt-5" style={{ height: '140px' }}>
           {monthlyData.map((d, i) => {
             const hPct = d.count > 0 ? (d.count / peakCount) * 100 : 4
@@ -1070,7 +1133,7 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
             return (
               <div key={d.month} className="flex-1 flex flex-col items-center gap-1" style={{ height: '100%', justifyContent: 'flex-end' }}>
                 {d.count > 0 && (
-                  <span className="text-[9px] font-bold" style={{ color: isPeak ? GOLD : BLUE }}>{d.count}</span>
+                  <span className="text-[9px] font-bold" style={{ color: isPeak ? GOLD : primaryBlue }}>{d.count}</span>
                 )}
                 <motion.div initial={{ height: 0 }} animate={{ height: `${hPct}%` }}
                   transition={{ delay: 0.7 + i * 0.04, duration: 0.5, ease: 'easeOut' }}
@@ -1079,10 +1142,10 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
                     background: isPeak
                       ? `linear-gradient(to top, ${GOLD}60, ${GOLD})`
                       : d.count > 0
-                        ? `linear-gradient(to top, ${BLUE}40, ${BLUE})`
-                        : `${BLUE}15`,
-                    boxShadow: d.count > 0 ? `0 0 10px ${isPeak ? GOLD : BLUE}30` : 'none',
-                    borderTop: d.count > 0 ? `2px solid ${isPeak ? GOLD : BLUE}` : 'none',
+                        ? `linear-gradient(to top, ${primaryBlue}55, ${primaryBlue})`
+                        : `${primaryBlue}22`,
+                      boxShadow: d.count > 0 ? `0 0 10px ${isPeak ? GOLD : primaryBlue}30` : 'none',
+                      borderTop: d.count > 0 ? `2px solid ${isPeak ? GOLD : primaryBlue}` : 'none',
                   }}
                 />
                 <span className="text-[8px] sm:text-[9px] text-slate-500">{d.month}</span>
@@ -1098,18 +1161,18 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
           const breaks = vals.filter(v => v === 0).length
           return (
             <div className="flex gap-6 mt-4 pt-3 border-t border-slate-700/30">
-              <span className="text-[10px] text-slate-400">🔥 Longest streak: <strong className="text-white">{maxStreak} month{maxStreak !== 1 ? 's' : ''}</strong></span>
-              <span className="text-[10px] text-slate-400">💤 Break months: <strong className="text-white">{breaks}</strong></span>
+              <span className="text-[10px] text-slate-400">Longest streak: <strong className="text-white">{maxStreak} month{maxStreak !== 1 ? 's' : ''}</strong></span>
+              <span className="text-[10px] text-slate-400">Break months: <strong className="text-white">{breaks}</strong></span>
             </div>
           )
         })()}
       </motion.div>
 
-      {/* ════════ MOOD PREFERENCES ════════ */}
+      {/* MOOD PREFERENCES */}
       {personalityProfile && Object.keys(personalityProfile.dominantMoods || {}).length > 0 && (
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🎭" title="Mood Preferences" />
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="P" title="Mood Preferences" />
           <div className="flex flex-wrap gap-2 sm:gap-3 mt-4">
             {Object.entries(personalityProfile.dominantMoods).map(([mood, pct], i) => (
               <motion.span key={mood} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}
@@ -1123,35 +1186,39 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       )}
 
-      {/* ════════ READER EVOLUTION TIMELINE ════════ */}
+      {/* READER EVOLUTION TIMELINE */}
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.72 }}
-        className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-        <Heading icon="🧬" title="Reader Evolution Timeline" />
-        <div className="mt-4 overflow-x-auto pb-1">
-          <div className="min-w-[700px] flex items-start gap-3">
-            {evolutionTimeline.map((q, idx) => (
-              <React.Fragment key={q.id}>
-                <div className="min-w-[160px] rounded-xl border border-white/10 bg-white/5 p-3">
-                  <p className="text-[10px] uppercase tracking-wide text-slate-400">{q.label}</p>
-                  <p className="text-sm text-white font-semibold mt-1">{q.phaseLabel}</p>
-                  <p className="text-[11px] text-slate-300 mt-2">Genre: {titleCase(q.dominantGenre)}</p>
-                  <p className="text-[11px] text-slate-400">Mood: {q.dominantMood}</p>
-                  <p className="text-[11px] text-slate-400">Books: {q.totalBooks}</p>
-                </div>
-                {idx < evolutionTimeline.length - 1 && (
-                  <div className="self-center text-slate-500">→</div>
-                )}
-              </React.Fragment>
-            ))}
-          </div>
+        className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+        <Heading icon="E" title="Reader Evolution Timeline" />
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+          {evolutionTimeline.map((q) => (
+            <div
+              key={q.id}
+              className="rounded-xl p-3"
+              style={isDarkMode
+                ? { border: '1px solid rgba(255,255,255,0.10)', background: 'rgba(255,255,255,0.05)' }
+                : {
+                    border: '1px solid rgba(186, 218, 255, 0.34)',
+                    background: 'linear-gradient(150deg, rgba(30, 144, 255, 0.33), rgba(20, 96, 198, 0.28))',
+                    backdropFilter: 'blur(14px)',
+                    boxShadow: '0 8px 24px rgba(9, 58, 142, 0.28)',
+                  }}
+            >
+              <p className="text-[10px] uppercase tracking-wide" style={{ color: subtleTextColor }}>{q.label}</p>
+              <p className="text-sm font-semibold mt-1" style={{ color: strongTextColor }}>{q.phaseLabel}</p>
+              <p className="text-[11px] mt-2" style={{ color: strongTextColor }}>Genre: {titleCase(q.dominantGenre)}</p>
+              <p className="text-[11px]" style={{ color: subtleTextColor }}>Mood: {q.dominantMood}</p>
+              <p className="text-[11px]" style={{ color: subtleTextColor }}>Books: {q.totalBooks}</p>
+            </div>
+          ))}
         </div>
       </motion.div>
 
-      {/* ════════ READING DNA + CONFIDENCE ════════ */}
+      {/* READING DNA + CONFIDENCE */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.75 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🧪" title="Reading DNA Profile" />
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="D" title="Reading DNA Profile" />
           <div className="mt-4 space-y-3">
             {readingDNA.map((metric) => (
               <div key={metric.label}>
@@ -1174,8 +1241,8 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.78 }}
-          className="p-5 sm:p-6 rounded-2xl flex flex-col justify-center" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🎯" title="Recommendation Intelligence Score" />
+          className="p-5 sm:p-6 rounded-2xl flex flex-col justify-center" style={analyticsCardStyle}>
+          <Heading icon="S" title="Recommendation Intelligence Score" />
           <div className="mt-5 text-center">
             <div className="text-5xl sm:text-6xl font-black text-white" style={{ textShadow: `0 0 24px ${BLUE}` }}>{recommendationConfidence.score}%</div>
             <p className="text-xs text-slate-400 mt-2">Recommendation Confidence</p>
@@ -1184,17 +1251,17 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       </div>
 
-      {/* ════════ HIDDEN TASTE + UNIVERSE MAP ════════ */}
+      {/* HIDDEN TASTE + UNIVERSE MAP */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.8 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🔎" title="Hidden Taste Detection" />
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="H" title="Hidden Taste Detection" />
           {hiddenTaste ? (
             <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
               <p className="text-xs uppercase tracking-wide text-slate-400">Hidden Taste Detected</p>
               <p className="text-lg text-white font-semibold mt-1">{titleCase(hiddenTaste.genre)}</p>
               <p className="text-sm text-slate-300 mt-2 leading-relaxed">{hiddenTaste.message}</p>
-              <p className="text-xs text-slate-400 mt-3">Avg Rating: {hiddenTaste.avg.toFixed(1)} • Reads: {hiddenTaste.count}</p>
+              <p className="text-xs text-slate-400 mt-3">Avg Rating: {hiddenTaste.avg.toFixed(1)} | Reads: {hiddenTaste.count}</p>
             </div>
           ) : (
             <p className="text-sm text-slate-400 mt-4">No strong hidden affinity detected yet. Keep rating across genres to reveal latent tastes.</p>
@@ -1202,8 +1269,8 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.84 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🌌" title="Reading Universe Map" />
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="U" title="Reading Universe Map" />
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-3">
             <div className="h-6 rounded-lg overflow-hidden flex">
               {universeClusters.map((cluster) => (
@@ -1228,15 +1295,15 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       </div>
 
-      {/* ════════ RAREST DISCOVERY ════════ */}
+      {/* RAREST DISCOVERY */}
       {rarestDiscovery && (
         <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.88 }}
-          className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-          <Heading icon="🗝️" title="Your Rarest Discovery" />
+          className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+          <Heading icon="R" title="Your Rarest Discovery" />
           <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4 grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
             <div>
               <p className="text-lg text-white font-semibold">{rarestDiscovery.title}</p>
-              <p className="text-sm text-slate-300 mt-1">{rarestDiscovery.author || 'Unknown author'} • {titleCase(rarestDiscovery.genre || 'mixed')}</p>
+              <p className="text-sm text-slate-300 mt-1">{rarestDiscovery.author || 'Unknown author'} | {titleCase(rarestDiscovery.genre || 'mixed')}</p>
               <p className="text-sm text-slate-300 mt-3 leading-relaxed">Only a small fraction of readers explore books like this.</p>
             </div>
             <div className="self-end text-right">
@@ -1247,10 +1314,10 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
         </motion.div>
       )}
 
-      {/* ════════ FORECAST + REFLECTION ════════ */}
+      {/* FORECAST + REFLECTION */}
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.92 }}
-        className="p-5 sm:p-6 rounded-2xl" style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
-        <Heading icon="🔮" title="Reading Forecast" />
+        className="p-5 sm:p-6 rounded-2xl" style={analyticsCardStyle}>
+        <Heading icon="F" title="Reading Forecast" />
         <p className="text-sm sm:text-base text-slate-200 leading-relaxed mt-4">{readingForecast}</p>
         <div className="mt-5 pt-4 border-t border-white/10">
           <p className="text-xs uppercase tracking-wide text-slate-400">AI Reading Reflection</p>
@@ -1262,11 +1329,11 @@ export default function Dashboard({ personalityProfile, annualWrapped, previousR
 }
 
 
-/* ══════════════════════════════════════════════════════════════
- *  SUB-COMPONENTS
- * ══════════════════════════════════════════════════════════════ */
+/*
+ * SUB-COMPONENTS
+ */
 
-function AnimatedNumber({ value, className = '', suffix = '' }) {
+function AnimatedNumber({ value, className = '', suffix = '', styleOverride }) {
   const [display, setDisplay] = useState(0)
   const numVal = typeof value === 'string' ? parseInt(value) || 0 : value
   useEffect(() => {
@@ -1275,42 +1342,56 @@ function AnimatedNumber({ value, className = '', suffix = '' }) {
     const timer = setInterval(() => { start++; setDisplay(start); if (start >= numVal) clearInterval(timer) }, step)
     return () => clearInterval(timer)
   }, [numVal])
-  return <div className={className}>{display}{suffix}</div>
+  return <div className={className} style={styleOverride}>{display}{suffix}</div>
 }
 
-function StatCard({ label, value, sub, icon, color, delay }) {
+function StatCard({ label, value, sub, icon, color, delay, theme = 'dark' }) {
+  const isDarkMode = theme === 'dark'
+  const hoverGlow = isDarkMode ? `0 0 24px ${color}, 0 0 48px ${color}60` : LIGHT_HOVER_GLOW
+  const numberStyle = isDarkMode
+    ? undefined
+    : { color: '#8FDBFF', textShadow: '0 0 10px rgba(143,219,255,0.95), 0 0 22px rgba(32,159,255,0.8)' }
+  const labelColor = !isDarkMode && color === BLUE ? '#0A4FC5' : `${color}CC`
+  const localCardStyle = isDarkMode
+    ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }
+    : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(16px)' }
   return (
     <motion.div initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.5 }} whileHover={{ scale: 1.02, boxShadow: `0 0 24px ${color}, 0 0 48px ${color}60` }}
-      className="relative p-4 sm:p-5 rounded-2xl overflow-hidden transition-shadow duration-300"
-      style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+      transition={{ delay, duration: 0.5 }} whileHover={{ scale: 1.02, boxShadow: hoverGlow }}
+      className="relative p-4 sm:p-5 rounded-2xl overflow-hidden transition-shadow duration-100"
+      style={localCardStyle}>
       <motion.div initial={{ top: '-20%' }} animate={{ top: '120%' }}
         transition={{ duration: 3.5, repeat: Infinity, repeatDelay: 3, delay: delay + 1 }}
         className="absolute left-0 right-0 h-px pointer-events-none"
         style={{ background: `linear-gradient(90deg, transparent, ${color}40, transparent)` }} />
       <div className="text-lg mb-1">{icon}</div>
-      <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: `${color}CC` }}>{label}</div>
-      <div className="text-2xl sm:text-3xl font-black text-white">{value}</div>
+      <div className="text-[10px] sm:text-xs uppercase tracking-wider font-semibold mb-1" style={{ color: labelColor }}>{label}</div>
+      <div className="text-2xl sm:text-3xl font-black" style={numberStyle}>{value}</div>
       <p className="text-[9px] sm:text-[10px] text-slate-400 mt-0.5 truncate">{sub}</p>
     </motion.div>
   )
 }
 
-function GlowCard({ children, delay = 0 }) {
+function GlowCard({ children, delay = 0, theme = 'dark' }) {
+  const isDarkMode = theme === 'dark'
+  const localCardStyle = isDarkMode
+    ? { background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }
+    : { background: LIGHT_CARD_BG, border: `1px solid ${LIGHT_CARD_BORDER}`, boxShadow: LIGHT_CARD_SHADOW, backdropFilter: 'blur(16px)' }
+  const hoverGlow = isDarkMode ? GLOW : LIGHT_HOVER_GLOW
   return (
     <motion.div initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, duration: 0.5 }} whileHover={{ scale: 1.02, boxShadow: GLOW }}
-      className="relative p-4 sm:p-5 rounded-2xl flex items-center justify-center overflow-hidden transition-shadow duration-300"
-      style={{ background: CARD_BG, border: `2px solid ${CARD_BORDER}`, boxShadow: GLOW_SOFT }}>
+      transition={{ delay, duration: 0.5 }} whileHover={{ scale: 1.02, boxShadow: hoverGlow }}
+      className="relative p-4 sm:p-5 rounded-2xl flex items-center justify-center overflow-hidden transition-shadow duration-100"
+      style={localCardStyle}>
       {children}
     </motion.div>
   )
 }
 
-function Heading({ icon, title }) {
+function Heading({ title }) {
   return (
     <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
-      <span style={{ color: BLUE }}>◈</span> {icon} {title}
+      {title}
     </h3>
   )
 }

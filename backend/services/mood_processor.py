@@ -9,7 +9,7 @@ import re
 from functools import lru_cache
 from typing import Dict, List, Optional, Sequence, Tuple
 
-from config.mood_map import GOEMOTIONS_LABELS, INTENSITY_MULTIPLIERS, moodMap
+from config.mood_map import GOEMOTIONS_LABELS, INTENSITY_MULTIPLIERS, moodMap, resolve_mood_context
 
 logger = logging.getLogger(__name__)
 
@@ -177,6 +177,24 @@ def process_mood_query(raw_query: Optional[str], threshold: float = 0.7) -> Dict
     if not normalized_query:
         raise ValueError("Query text cannot be empty")
 
+    contextual_mood, contextual_payload = resolve_mood_context(normalized_query)
+    if contextual_mood and contextual_payload:
+        logger.info(f"Detected contextual mood: {contextual_mood}")
+        return {
+            "normalized_query": normalized_query,
+            "detected_mood": contextual_mood,
+            "matched_mood": contextual_mood,
+            "matched_emotions": list(contextual_payload.get("emotions", [])),
+            "matched_tags": list(contextual_payload.get("tags", [])),
+            "intensity": str(contextual_payload.get("intensity", "medium")),
+            "emotion_category": contextual_mood,
+            "semantic_meaning": contextual_payload.get("semantic_meaning") or contextual_mood.replace("_", " "),
+            "similarity_score": 1.0,
+            "fallback_used": False,
+            "clarification_prompt": None,
+            "query_embedding": _embed_text(normalized_query),
+        }
+
     goemotion_label = _resolve_goemotions_label(normalized_query)
     if goemotion_label:
         logger.info(f"Detected GoEmotions label: {goemotion_label}")
@@ -187,8 +205,11 @@ def process_mood_query(raw_query: Optional[str], threshold: float = 0.7) -> Dict
             "matched_emotions": [goemotion_label],
             "matched_tags": [],
             "intensity": "medium",
+            "emotion_category": goemotion_label,
+            "semantic_meaning": goemotion_label,
             "similarity_score": 1.0,
             "fallback_used": False,
+            "clarification_prompt": None,
             "query_embedding": _embed_text(normalized_query),
         }
 
@@ -228,8 +249,11 @@ def process_mood_query(raw_query: Optional[str], threshold: float = 0.7) -> Dict
             "matched_emotions": [fallback_label] if fallback_label else [],
             "matched_tags": [],
             "intensity": "medium",
+            "emotion_category": fallback_label,
+            "semantic_meaning": fallback_label or normalized_query,
             "similarity_score": max(embedding_score, lexical_score),
             "fallback_used": True,
+            "clarification_prompt": None if fallback_label else "That's an interesting mood. Do you want something light, emotional, or intense?",
             "query_embedding": _embed_text(normalized_query),
         }
 
@@ -243,8 +267,11 @@ def process_mood_query(raw_query: Optional[str], threshold: float = 0.7) -> Dict
         "matched_emotions": list(payload.get("emotions", [])),
         "matched_tags": list(payload.get("tags", [])),
         "intensity": str(payload.get("intensity", "medium")),
+        "emotion_category": detected_mood,
+        "semantic_meaning": payload.get("semantic_meaning") or detected_mood,
         "similarity_score": similarity_score,
         "fallback_used": False,
+        "clarification_prompt": None,
         "query_embedding": _embed_text(normalized_query),
     }
 
